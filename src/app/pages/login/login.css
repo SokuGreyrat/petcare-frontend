@@ -1,14 +1,67 @@
-.pc-auth-logo {
-  width: 54px;
-  height: 54px;
-  border-radius: 18px;
-  display: grid;
-  place-items: center;
-  font-size: 1.4rem;
-  background: radial-gradient(circle at 20% 0%, rgba(124, 92, 255, 0.95), rgba(44, 224, 197, 0.55));
-  border: 1px solid rgba(255,255,255,0.16);
+/* Logo image fits */
+.pc-auth-logo img {
+  display: block;
 }
 
-code {
-  color: rgba(255,255,255,0.86);
+/* Right panel polish */
+.pc-right{
+  position: relative;
+  overflow: hidden;
+}
+
+.pc-right::before{
+  content:"";
+  position:absolute;
+  inset:-140px -140px auto auto;
+  width:320px;
+  height:320px;
+  background: radial-gradient(circle, rgba(109,94,252,.35), transparent 60%);
+  pointer-events:none;
+}
+
+.pc-right::after{
+  content:"";
+  position:absolute;
+  inset:auto auto -160px -160px;
+  width:360px;
+  height:360px;
+  background: radial-gradient(circle, rgba(35,184,255,.20), transparent 60%);
+  pointer-events:none;
+}
+
+.pc-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 10px;
+  border-radius:999px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.10);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.pc-right-mark{
+  width:42px;
+  height:42px;
+  border-radius:14px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.10);
+}
+
+.pc-right-mark i{
+  font-size: 20px;
+}
+
+.pc-feature{
+  transition: transform .15s ease, background .15s ease, border-color .15s ease;
+}
+
+.pc-feature:hover{
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,.18);
+  background: rgba(0,0,0,.18);
 }
