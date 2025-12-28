@@ -1,0 +1,328 @@
+<div class="d-flex align-items-center justify-content-between gap-2">
+  <div>
+    <div class="h3 m-0 pc-title">Mascotas</div>
+    <div class="pc-muted">Control completo: perfil, fotos, tratamientos y GPS.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-light pc-btn" (click)="reload()"><i class="bi bi-arrow-clockwise"></i></button>
+    <button class="btn btn-primary pc-btn" (click)="openCreate()"><i class="bi bi-plus-lg me-1"></i>Nueva mascota</button>
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-12 col-lg-4">
+    <div class="pc-card pc-shadow p-3">
+      <div class="d-flex align-items-center justify-content-between">
+        <div class="h5 m-0 pc-title">Mis mascotas</div>
+        <span class="pc-badge">{{ myMascotas().length }}</span>
+      </div>
+      <div class="pc-divider my-3"></div>
+
+      @if (myMascotas().length === 0) {
+        <div class="pc-muted">Aún no tienes mascotas registradas.</div>
+      }
+
+      <div class="d-grid gap-2">
+        @for (m of myMascotas(); track m.id) {
+          <button class="pc-pet-item pc-surface text-start" [class.active]="selectedId() === m.id" (click)="selectedId.set(m.id!)">
+            <div class="d-flex align-items-center justify-content-between">
+              <div>
+                <div class="fw-semibold">{{ m.nombre }}</div>
+                <div class="small pc-muted">{{ m.especie || 'Mascota' }} · {{ m.raza || '—' }}</div>
+              </div>
+              <i class="bi bi-chevron-right"></i>
+            </div>
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-8">
+    @if (!selected()) {
+      <div class="pc-card pc-shadow p-4">
+        <div class="h5 pc-title">Selecciona una mascota</div>
+        <div class="pc-muted">O crea una nueva para empezar.</div>
+      </div>
+    } @else {
+      <div class="pc-card pc-shadow p-3">
+        <div class="d-flex align-items-start justify-content-between gap-2">
+          <div>
+            <div class="h4 m-0 pc-title">{{ selected()?.nombre }}</div>
+            <div class="pc-muted">{{ selected()?.especie || 'Mascota' }} · {{ selected()?.raza || '—' }}</div>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-light pc-btn" (click)="openEdit()"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-outline-danger pc-btn" (click)="deletePet()"><i class="bi bi-trash"></i></button>
+          </div>
+        </div>
+
+        <div class="pc-divider my-3"></div>
+
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-outline-light pc-btn" [class.active]="tab() === 'info'" (click)="tab.set('info')"><i class="bi bi-card-text me-1"></i>Info</button>
+          <button class="btn btn-outline-light pc-btn" [class.active]="tab() === 'fotos'" (click)="tab.set('fotos')"><i class="bi bi-images me-1"></i>Fotos</button>
+          <button class="btn btn-outline-light pc-btn" [class.active]="tab() === 'tratamientos'" (click)="tab.set('tratamientos')"><i class="bi bi-capsule me-1"></i>Tratamientos</button>
+          <button class="btn btn-outline-light pc-btn" [class.active]="tab() === 'gps'" (click)="tab.set('gps')"><i class="bi bi-geo-alt me-1"></i>GPS</button>
+        </div>
+
+        <div class="pc-divider my-3"></div>
+
+        @if (tab() === 'info') {
+          <div class="row g-3">
+            <div class="col-12 col-md-6">
+              <div class="pc-surface p-3">
+                <div class="pc-muted small">Peso</div>
+                <div class="fw-semibold">{{ selected()?.peso || '—' }} kg</div>
+              </div>
+            </div>
+            <div class="col-12 col-md-6">
+              <div class="pc-surface p-3">
+                <div class="pc-muted small">Género</div>
+                <div class="fw-semibold">{{ selected()?.genero || '—' }}</div>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="pc-surface p-3">
+                <div class="pc-muted small">Descripción</div>
+                <div style="white-space: pre-wrap;">{{ selected()?.descripcion || '—' }}</div>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="d-flex flex-wrap gap-2">
+                <span class="pc-badge"><i class="bi bi-shield-check me-1"></i>Seguro: {{ selected()?.tieneSeguro ? 'Sí' : 'No' }}</span>
+                <span class="pc-badge"><i class="bi bi-check2-circle me-1"></i>Vacunado: {{ selected()?.vacunado ? 'Sí' : 'No' }}</span>
+                <span class="pc-badge"><i class="bi bi-scissors me-1"></i>Esterilizado: {{ selected()?.esterilizado ? 'Sí' : 'No' }}</span>
+              </div>
+            </div>
+          </div>
+        }
+
+        @if (tab() === 'fotos') {
+          <div class="row g-2 align-items-end">
+            <div class="col-12 col-md-9">
+              <label class="form-label">Agregar URL de foto</label>
+              <input class="form-control pc-input" [formControl]="imageUrl" placeholder="https://..." />
+            </div>
+            <div class="col-12 col-md-3">
+              <button class="btn btn-primary pc-btn w-100" (click)="addImage()"><i class="bi bi-plus-lg me-1"></i>Agregar</button>
+            </div>
+          </div>
+
+          <div class="pc-divider my-3"></div>
+
+          @if (petImages(selected()?.id).length === 0) {
+            <div class="pc-muted">Sin fotos todavía.</div>
+          }
+
+          <div class="pc-photo-grid">
+            @for (im of petImages(selected()?.id); track im.id) {
+              <div class="pc-photo">
+                <img [src]="im.ruta" alt="" />
+                <button class="btn btn-sm btn-danger pc-photo-del" (click)="deleteImage(im)"><i class="bi bi-trash"></i></button>
+              </div>
+            }
+          </div>
+        }
+
+        @if (tab() === 'tratamientos') {
+          <div class="pc-surface p-3">
+            <div class="fw-semibold">Nuevo tratamiento</div>
+            <form class="row g-2 mt-1" [formGroup]="tratamientoForm" (ngSubmit)="addTratamiento()">
+              <div class="col-12 col-md-4">
+                <input class="form-control pc-input" formControlName="tipoTratamiento" placeholder="Tipo" />
+              </div>
+              <div class="col-6 col-md-3">
+                <input class="form-control pc-input" type="date" formControlName="fecha" />
+              </div>
+              <div class="col-6 col-md-3">
+                <input class="form-control pc-input" formControlName="veterinario" placeholder="Veterinario" />
+              </div>
+              <div class="col-12 col-md-2">
+                <input class="form-control pc-input" type="number" formControlName="costo" placeholder="$" />
+              </div>
+              <div class="col-12">
+                <input class="form-control pc-input" formControlName="descripcion" placeholder="Descripción (opcional)" />
+              </div>
+              <div class="col-12 d-flex justify-content-end">
+                <button class="btn btn-primary pc-btn" type="submit"><i class="bi bi-plus-lg me-1"></i>Guardar</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="pc-divider my-3"></div>
+
+          @if (petTratamientos(selected()?.id).length === 0) {
+            <div class="pc-muted">Sin tratamientos registrados.</div>
+          }
+
+          <div class="d-grid gap-2">
+            @for (t of petTratamientos(selected()?.id); track t.id) {
+              <div class="pc-surface p-3">
+                <div class="d-flex align-items-start justify-content-between">
+                  <div>
+                    <div class="fw-semibold">{{ t.tipoTratamiento }}</div>
+                    <div class="small pc-muted">{{ t.veterinario || '—' }} · {{ format(t.fecha) }}</div>
+                    @if (t.descripcion) {
+                      <div class="small mt-1" style="white-space: pre-wrap;">{{ t.descripcion }}</div>
+                    }
+                  </div>
+                  <div class="text-end">
+                    <div class="fw-semibold">@if (t.costo) { ${{ t.costo }} } @else { — }</div>
+                    <button class="btn btn-sm btn-outline-danger pc-btn mt-2" (click)="deleteTratamiento(t)">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        @if (tab() === 'gps') {
+          <div class="pc-surface p-3">
+            <div class="fw-semibold">Agregar ubicación</div>
+            <form class="row g-2 mt-1" [formGroup]="gpsForm" (ngSubmit)="addGPS()">
+              <div class="col-6 col-md-4">
+                <input class="form-control pc-input" type="number" step="0.000001" formControlName="latitud" placeholder="Latitud" />
+              </div>
+              <div class="col-6 col-md-4">
+                <input class="form-control pc-input" type="number" step="0.000001" formControlName="longitud" placeholder="Longitud" />
+              </div>
+              <div class="col-12 col-md-4">
+                <input class="form-control pc-input" formControlName="timestamp" placeholder="Timestamp (opcional)" />
+              </div>
+              <div class="col-12 d-flex justify-content-end">
+                <button class="btn btn-primary pc-btn" type="submit"><i class="bi bi-plus-lg me-1"></i>Agregar</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="pc-divider my-3"></div>
+
+          @if (petGPS(selected()?.id).length === 0) {
+            <div class="pc-muted">Sin puntos GPS todavía.</div>
+          }
+
+          <div class="d-grid gap-2">
+            @for (g of petGPS(selected()?.id); track g.id) {
+              <div class="pc-surface p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                  <div>
+                    <div class="fw-semibold">{{ g.latitud }}, {{ g.longitud }}</div>
+                    <div class="small pc-muted">{{ g.timestamp || '—' }}</div>
+                  </div>
+                  <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-light pc-btn" (click)="openMap(g)"><i class="bi bi-map"></i></button>
+                    <button class="btn btn-sm btn-outline-danger pc-btn" (click)="deleteGPS(g)"><i class="bi bi-trash"></i></button>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>
+
+<app-modal [open]="showCreate()" title="Registrar mascota" (closed)="showCreate.set(false)">
+  <form class="row g-2" [formGroup]="createForm" (ngSubmit)="createPet()">
+    <div class="col-12">
+      <label class="form-label">Nombre</label>
+      <input class="form-control pc-input" formControlName="nombre" placeholder="Luna" />
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Especie</label>
+      <input class="form-control pc-input" formControlName="especie" placeholder="Perro / Gato" />
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Raza</label>
+      <input class="form-control pc-input" formControlName="raza" placeholder="Labrador" />
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Género</label>
+      <input class="form-control pc-input" formControlName="genero" placeholder="Hembra / Macho" />
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Peso (kg)</label>
+      <input class="form-control pc-input" type="number" formControlName="peso" />
+    </div>
+
+    <div class="col-12">
+      <label class="form-label">Descripción</label>
+      <textarea class="form-control pc-input" rows="3" formControlName="descripcion" placeholder="Notas, alergias, etc."></textarea>
+    </div>
+
+    <div class="col-12">
+      <div class="d-flex flex-wrap gap-3">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="vac" formControlName="vacunado" />
+          <label class="form-check-label" for="vac">Vacunado</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="est" formControlName="esterilizado" />
+          <label class="form-check-label" for="est">Esterilizado</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="seg" formControlName="tieneSeguro" />
+          <label class="form-check-label" for="seg">Tiene seguro</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 d-flex justify-content-end gap-2">
+      <button type="button" class="btn btn-outline-light pc-btn" (click)="showCreate.set(false)">Cancelar</button>
+      <button class="btn btn-primary pc-btn" type="submit">Guardar</button>
+    </div>
+  </form>
+</app-modal>
+
+<app-modal [open]="showEdit()" title="Editar mascota" (closed)="showEdit.set(false)">
+  <form class="row g-2" [formGroup]="editForm" (ngSubmit)="saveEdit()">
+    <div class="col-12">
+      <label class="form-label">Nombre</label>
+      <input class="form-control pc-input" formControlName="nombre" />
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Especie</label>
+      <input class="form-control pc-input" formControlName="especie" />
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Raza</label>
+      <input class="form-control pc-input" formControlName="raza" />
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Género</label>
+      <input class="form-control pc-input" formControlName="genero" />
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Peso (kg)</label>
+      <input class="form-control pc-input" type="number" formControlName="peso" />
+    </div>
+    <div class="col-12">
+      <label class="form-label">Descripción</label>
+      <textarea class="form-control pc-input" rows="3" formControlName="descripcion"></textarea>
+    </div>
+    <div class="col-12">
+      <div class="d-flex flex-wrap gap-3">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="vac2" formControlName="vacunado" />
+          <label class="form-check-label" for="vac2">Vacunado</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="est2" formControlName="esterilizado" />
+          <label class="form-check-label" for="est2">Esterilizado</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="seg2" formControlName="tieneSeguro" />
+          <label class="form-check-label" for="seg2">Tiene seguro</label>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 d-flex justify-content-end gap-2">
+      <button type="button" class="btn btn-outline-light pc-btn" (click)="showEdit.set(false)">Cancelar</button>
+      <button class="btn btn-primary pc-btn" type="submit">Guardar cambios</button>
+    </div>
+  </form>
+</app-modal>

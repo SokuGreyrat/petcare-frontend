@@ -1,0 +1,15 @@
+@if (open) {
+  <div class="pc-modal-backdrop" (click)="close()"></div>
+  <div class="pc-modal" role="dialog" aria-modal="true">
+    <div class="pc-modal-inner pc-card pc-shadow" [class]="wClass()">
+      <div class="d-flex align-items-center justify-content-between gap-2">
+        <div class="h5 m-0 pc-title">{{ title }}</div>
+        <button class="btn btn-sm btn-outline-light pc-btn" (click)="close()">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+      <div class="pc-divider my-3"></div>
+      <ng-content></ng-content>
+    </div>
+  </div>
+}

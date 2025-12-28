@@ -1,0 +1,193 @@
+<div class="d-flex align-items-center justify-content-between gap-2">
+  <div>
+    <div class="h3 m-0 pc-title">Adopciones</div>
+    <div class="pc-muted">Publica, explora y da seguimiento a solicitudes.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-light pc-btn" (click)="reload()"><i class="bi bi-arrow-clockwise"></i></button>
+    <button class="btn btn-primary pc-btn" (click)="openPublish()"><i class="bi bi-plus-lg me-1"></i>Publicar</button>
+  </div>
+</div>
+
+<div class="d-flex flex-wrap gap-2 mt-3">
+  <button class="btn btn-outline-light pc-btn" [class.active]="tab() === 'explorar'" (click)="tab.set('explorar')"><i class="bi bi-search me-1"></i>Explorar</button>
+  <button class="btn btn-outline-light pc-btn" [class.active]="tab() === 'misPublicaciones'" (click)="tab.set('misPublicaciones')"><i class="bi bi-megaphone me-1"></i>Mis publicaciones</button>
+  <button class="btn btn-outline-light pc-btn" [class.active]="tab() === 'misSolicitudes'" (click)="tab.set('misSolicitudes')"><i class="bi bi-inbox me-1"></i>Mis solicitudes</button>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-12 col-xl-8">
+    @if (tab() === 'explorar') {
+      <div class="d-grid gap-3">
+        @if (available().length === 0) {
+          <div class="pc-card pc-shadow p-4">
+            <div class="h5 pc-title">No hay adopciones disponibles</div>
+            <div class="pc-muted">Vuelve más tarde o publica una adopción.</div>
+          </div>
+        }
+
+        @for (a of available(); track a.id) {
+          <div class="pc-card pc-shadow p-3">
+            <div class="d-flex align-items-start justify-content-between gap-2">
+              <div>
+                <div class="h5 m-0 pc-title">{{ petName(a.mascotaId) }}</div>
+                <div class="pc-muted">{{ petInfo(a.mascotaId) }}</div>
+                <div class="small pc-muted mt-1">Publicado por {{ ownerName(a.usuarioPublicadorId) }} · {{ format(a.fechaPublicacion) }}</div>
+              </div>
+              <span class="pc-badge"><i class="bi bi-check2-circle me-1"></i>Disponible</span>
+            </div>
+            <div class="pc-divider my-3"></div>
+            <div class="d-flex justify-content-end">
+              @if (a.usuarioPublicadorId === me().id) {
+                <span class="pc-muted small">Esta adopción es tuya.</span>
+              } @else {
+                <button class="btn btn-primary pc-btn" (click)="openRequest(a)"><i class="bi bi-send me-1"></i>Solicitar</button>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    }
+
+    @if (tab() === 'misPublicaciones') {
+      <div class="d-grid gap-3">
+        @if (myPublications().length === 0) {
+          <div class="pc-card pc-shadow p-4">
+            <div class="h5 pc-title">No has publicado adopciones</div>
+            <div class="pc-muted">Publica una adopción para empezar.</div>
+          </div>
+        }
+
+        @for (a of myPublications(); track a.id) {
+          <div class="pc-card pc-shadow p-3">
+            <div class="d-flex align-items-start justify-content-between gap-2">
+              <div>
+                <div class="h5 m-0 pc-title">{{ petName(a.mascotaId) }}</div>
+                <div class="pc-muted">{{ petInfo(a.mascotaId) }}</div>
+                <div class="small pc-muted mt-1">{{ format(a.fechaPublicacion) }}</div>
+              </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline-light pc-btn" (click)="toggleDisponible(a)">
+                  @if (a.disponible) { <i class="bi bi-toggle-on"></i> } @else { <i class="bi bi-toggle-off"></i> }
+                  <span class="ms-1">{{ a.disponible ? 'Activa' : 'Pausada' }}</span>
+                </button>
+                <button class="btn btn-outline-danger pc-btn" (click)="deleteAdopcion(a)"><i class="bi bi-trash"></i></button>
+              </div>
+            </div>
+
+            <div class="pc-divider my-3"></div>
+            <div class="fw-semibold mb-2">Solicitudes recibidas</div>
+
+            @if (requestsForAdopcion(a.id).length === 0) {
+              <div class="pc-muted">Todavía no hay solicitudes.</div>
+            } @else {
+              <div class="d-grid gap-2">
+                @for (s of requestsForAdopcion(a.id); track s.id) {
+                  <div class="pc-surface p-3">
+                    <div class="d-flex align-items-start justify-content-between gap-2">
+                      <div>
+                        <div class="fw-semibold">Solicitante #{{ s.solicitanteId }}</div>
+                        <div class="small pc-muted">{{ format(s.fechaSolicitud) }}</div>
+                        @if (s.mensaje) {
+                          <div class="small mt-1" style="white-space: pre-wrap;">{{ s.mensaje }}</div>
+                        }
+                      </div>
+                      <div class="text-end">
+                        <span class="pc-badge">{{ s.estado }}</span>
+                        <div class="d-flex gap-2 mt-2 justify-content-end">
+                          <button class="btn btn-sm btn-outline-light pc-btn" (click)="setEstadoSolicitud(s, 'APROBADA')">Aprobar</button>
+                          <button class="btn btn-sm btn-outline-danger pc-btn" (click)="setEstadoSolicitud(s, 'RECHAZADA')">Rechazar</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    @if (tab() === 'misSolicitudes') {
+      <div class="d-grid gap-3">
+        @if (myRequests().length === 0) {
+          <div class="pc-card pc-shadow p-4">
+            <div class="h5 pc-title">Aún no has solicitado adopciones</div>
+            <div class="pc-muted">Explora adopciones y envía una solicitud.</div>
+          </div>
+        }
+
+        @for (s of myRequests(); track s.id) {
+          <div class="pc-card pc-shadow p-3">
+            <div class="d-flex align-items-start justify-content-between gap-2">
+              <div>
+                <div class="fw-semibold">Solicitud #{{ s.id }}</div>
+                <div class="small pc-muted">Adopción #{{ s.adopcionId }} · {{ format(s.fechaSolicitud) }}</div>
+                @if (s.mensaje) { <div class="small mt-2" style="white-space: pre-wrap;">{{ s.mensaje }}</div> }
+              </div>
+              <span class="pc-badge">{{ s.estado }}</span>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <div class="col-12 col-xl-4">
+    <div class="pc-card pc-shadow p-3">
+      <div class="h5 pc-title">Tu inventario</div>
+      <div class="pc-muted small">Mascotas que puedes publicar</div>
+      <div class="pc-divider my-3"></div>
+      @if (myPets().length === 0) {
+        <div class="pc-muted">No tienes mascotas registradas.</div>
+      } @else {
+        <div class="d-grid gap-2">
+          @for (m of myPets(); track m.id) {
+            <div class="pc-surface p-3">
+              <div class="fw-semibold">{{ m.nombre }}</div>
+              <div class="small pc-muted">{{ m.especie || 'Mascota' }} · {{ m.raza || '—' }}</div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</div>
+
+<app-modal [open]="showPublish()" title="Publicar adopción" (closed)="showPublish.set(false)">
+  <form class="d-grid gap-3" [formGroup]="publishForm" (ngSubmit)="publish()">
+    <div>
+      <label class="form-label">Mascota</label>
+      <select class="form-select pc-input" formControlName="mascotaId">
+        <option [ngValue]="null">Selecciona…</option>
+        @for (m of myPets(); track m.id) {
+          <option [ngValue]="m.id">{{ m.nombre }} ({{ m.especie || 'Mascota' }})</option>
+        }
+      </select>
+    </div>
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" id="disp" formControlName="disponible" />
+      <label class="form-check-label" for="disp">Disponible</label>
+    </div>
+    <div class="d-flex justify-content-end gap-2">
+      <button type="button" class="btn btn-outline-light pc-btn" (click)="showPublish.set(false)">Cancelar</button>
+      <button class="btn btn-primary pc-btn" type="submit">Publicar</button>
+    </div>
+  </form>
+</app-modal>
+
+<app-modal [open]="showRequest()" title="Solicitar adopción" (closed)="showRequest.set(false)">
+  <div class="pc-muted">Vas a solicitar: <span class="fw-semibold">{{ petName(requestTarget()?.mascotaId || 0) }}</span></div>
+  <div class="pc-divider my-3"></div>
+  <form class="d-grid gap-3" [formGroup]="requestForm" (ngSubmit)="sendRequest()">
+    <div>
+      <label class="form-label">Mensaje (opcional)</label>
+      <textarea class="form-control pc-input" rows="4" formControlName="mensaje" placeholder="Cuéntale al dueño por qué serías un buen adoptante..."></textarea>
+    </div>
+    <div class="d-flex justify-content-end gap-2">
+      <button type="button" class="btn btn-outline-light pc-btn" (click)="showRequest.set(false)">Cancelar</button>
+      <button class="btn btn-primary pc-btn" type="submit">Enviar solicitud</button>
+    </div>
+  </form>
+</app-modal>

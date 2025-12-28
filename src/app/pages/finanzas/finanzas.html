@@ -1,0 +1,165 @@
+<div class="d-flex align-items-center justify-content-between gap-2">
+  <div>
+    <div class="h3 m-0 pc-title">Finanzas</div>
+    <div class="pc-muted">Presupuesto mensual y gastos por mascota.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-light pc-btn" (click)="reload()"><i class="bi bi-arrow-clockwise"></i></button>
+    <button class="btn btn-outline-light pc-btn" (click)="openBudget()"><i class="bi bi-wallet2 me-1"></i>Presupuesto</button>
+    <button class="btn btn-primary pc-btn" (click)="openGasto()"><i class="bi bi-plus-lg me-1"></i>Registrar gasto</button>
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-12 col-xl-4">
+    <div class="pc-card pc-shadow p-3">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <div class="h5 m-0 pc-title">Mes</div>
+          <div class="pc-muted small">Selecciona para ver resumen</div>
+        </div>
+        <input class="form-control pc-input" style="width: 140px" type="month" [value]="month()" (change)="month.set(($any($event.target).value))" />
+      </div>
+
+      <div class="pc-divider my-3"></div>
+
+      <div class="d-grid gap-2">
+        <div class="pc-surface p-3">
+          <div class="pc-muted small">Presupuesto</div>
+          <div class="h4 m-0">@if (budgetMes()) { ${{ budgetMes()?.monto }} } @else { — }</div>
+        </div>
+        <div class="pc-surface p-3">
+          <div class="pc-muted small">Gasto del mes</div>
+          <div class="h4 m-0">${{ totalMes() }}</div>
+        </div>
+        <div class="pc-surface p-3" [class.negative]="restante() < 0">
+          <div class="pc-muted small">Restante</div>
+          <div class="h4 m-0">${{ restante() }}</div>
+        </div>
+      </div>
+
+      <div class="pc-divider my-3"></div>
+
+      <div class="pc-muted small">Por categoría</div>
+      <div class="d-grid gap-2 mt-2">
+        @for (c of byCategoria(); track c.categoria) {
+          <div>
+            <div class="d-flex justify-content-between small">
+              <span>{{ c.categoria }}</span>
+              <span class="fw-semibold">${{ c.monto }}</span>
+            </div>
+            <div class="progress" style="height: 7px; background: rgba(255,255,255,0.08)">
+              <div
+                class="progress-bar"
+                role="progressbar"
+                [style.width]="(totalMes() ? (c.monto / totalMes()) * 100 : 0) + '%'"
+              ></div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-xl-8">
+    <div class="pc-card pc-shadow p-3">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <div class="h5 m-0 pc-title">Gastos del mes</div>
+          <div class="pc-muted small">{{ gastosMes().length }} registros</div>
+        </div>
+      </div>
+
+      <div class="pc-divider my-3"></div>
+
+      @if (gastosMes().length === 0) {
+        <div class="pc-muted">No hay gastos registrados en este mes.</div>
+      } @else {
+        <div class="table-responsive">
+          <table class="table table-dark table-hover align-middle">
+            <thead>
+              <tr>
+                <th>Categoría</th>
+                <th>Monto</th>
+                <th>Mascota</th>
+                <th>Fecha</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (g of gastosMes(); track g.id) {
+                <tr>
+                  <td>{{ g.categoria }}</td>
+                  <td class="fw-semibold">${{ g.monto }}</td>
+                  <td>{{ mascotaLabel(g.mascotaId) }}</td>
+                  <td class="small pc-muted">{{ format(g.fecha) }}</td>
+                  <td class="text-end">
+                    <button class="btn btn-sm btn-outline-danger pc-btn" (click)="deleteGasto(g)"><i class="bi bi-trash"></i></button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+</div>
+
+<app-modal [open]="showGasto()" title="Registrar gasto" (closed)="showGasto.set(false)">
+  <form class="row g-2" [formGroup]="gastoForm" (ngSubmit)="createGasto()">
+    <div class="col-12 col-md-6">
+      <label class="form-label">Categoría</label>
+      <input class="form-control pc-input" formControlName="categoria" placeholder="Veterinario / Alimento / Accesorios" />
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Monto</label>
+      <input class="form-control pc-input" type="number" formControlName="monto" />
+    </div>
+
+    <div class="col-12 col-md-6">
+      <label class="form-label">Mascota (opcional)</label>
+      <select class="form-select pc-input" formControlName="mascotaId">
+        <option [ngValue]="null">—</option>
+        @for (m of myMascotas(); track m.id) {
+          <option [ngValue]="m.id">{{ m.nombre }}</option>
+        }
+      </select>
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Proveedor (opcional)</label>
+      <input class="form-control pc-input" formControlName="proveedor" placeholder="Clínica / Tienda" />
+    </div>
+
+    <div class="col-12 col-md-6">
+      <label class="form-label">Fecha</label>
+      <input class="form-control pc-input" type="date" formControlName="fecha" />
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Recordatorio (opcional)</label>
+      <input class="form-control pc-input" type="date" formControlName="fechaRecordatorio" />
+    </div>
+
+    <div class="col-12 d-flex justify-content-end gap-2">
+      <button type="button" class="btn btn-outline-light pc-btn" (click)="showGasto.set(false)">Cancelar</button>
+      <button class="btn btn-primary pc-btn" type="submit">Guardar</button>
+    </div>
+  </form>
+</app-modal>
+
+<app-modal [open]="showBudget()" title="Presupuesto mensual" (closed)="showBudget.set(false)">
+  <form class="row g-2" [formGroup]="budgetForm" (ngSubmit)="saveBudget()">
+    <div class="col-12 col-md-6">
+      <label class="form-label">Mes</label>
+      <input class="form-control pc-input" type="month" formControlName="mes" />
+    </div>
+    <div class="col-12 col-md-6">
+      <label class="form-label">Monto</label>
+      <input class="form-control pc-input" type="number" formControlName="monto" />
+    </div>
+    <div class="col-12 d-flex justify-content-end gap-2">
+      <button type="button" class="btn btn-outline-light pc-btn" (click)="showBudget.set(false)">Cancelar</button>
+      <button class="btn btn-primary pc-btn" type="submit">Guardar</button>
+    </div>
+  </form>
+</app-modal>

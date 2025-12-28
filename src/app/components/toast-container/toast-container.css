@@ -1,0 +1,30 @@
+.pc-toast-wrap {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1056;
+  width: min(420px, calc(100vw - 32px));
+}
+
+.pc-toast-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pc-toast {
+  padding: 12px 12px;
+}
+
+.pc-toast-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-top: 6px;
+  background: rgba(255,255,255,0.45);
+}
+
+.pc-toast-dot.success { background: rgba(44, 224, 197, 0.95); }
+.pc-toast-dot.warning { background: rgba(255, 204, 102, 0.95); }
+.pc-toast-dot.danger { background: rgba(255, 92, 122, 0.95); }
+.pc-toast-dot.info { background: rgba(124, 92, 255, 0.95); }

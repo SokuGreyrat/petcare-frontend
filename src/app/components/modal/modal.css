@@ -1,0 +1,27 @@
+.pc-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 1050;
+}
+
+.pc-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  z-index: 1051;
+}
+
+.pc-modal-inner {
+  width: min(720px, calc(100vw - 36px));
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+  padding: 16px;
+}
+
+.pc-modal-sm { width: min(480px, calc(100vw - 36px)); }
+.pc-modal-md { width: min(720px, calc(100vw - 36px)); }
+.pc-modal-lg { width: min(980px, calc(100vw - 36px)); }

@@ -1,0 +1,7 @@
+{
+  "/api": {
+    "target": "https://petcare-t2bx.onrender.com",
+    "secure": true,
+    "changeOrigin": true
+  }
+}

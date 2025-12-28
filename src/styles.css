@@ -1,0 +1,126 @@
+@import "bootstrap/dist/css/bootstrap.min.css";
+@import "bootstrap-icons/font/bootstrap-icons.css";
+
+:root {
+  --pc-bg: #0b1020;
+  --pc-surface: rgba(255, 255, 255, 0.06);
+  --pc-surface-2: rgba(255, 255, 255, 0.08);
+  --pc-border: rgba(255, 255, 255, 0.12);
+  --pc-text: rgba(255, 255, 255, 0.92);
+  --pc-muted: rgba(255, 255, 255, 0.68);
+  --pc-accent: #7c5cff;
+  --pc-accent-2: #2ce0c5;
+  --pc-warn: #ffcc66;
+  --pc-danger: #ff5c7a;
+  --pc-radius: 18px;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--pc-text);
+  background: radial-gradient(1200px 600px at 20% -10%, rgba(124, 92, 255, 0.45), transparent 60%),
+    radial-gradient(900px 500px at 90% 0%, rgba(44, 224, 197, 0.35), transparent 60%),
+    radial-gradient(900px 500px at 50% 120%, rgba(255, 92, 122, 0.20), transparent 55%),
+    var(--pc-bg);
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji",
+    "Segoe UI Emoji";
+  overflow-x: hidden;
+}
+
+a {
+  color: inherit;
+}
+
+.pc-surface {
+  background: var(--pc-surface);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius);
+  backdrop-filter: blur(10px);
+}
+
+.pc-surface-2 {
+  background: var(--pc-surface-2);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius);
+  backdrop-filter: blur(10px);
+}
+
+.pc-btn {
+  border-radius: 999px;
+}
+
+.pc-input {
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.14) !important;
+  background: rgba(10, 14, 28, 0.55) !important;
+  color: var(--pc-text) !important;
+}
+
+.pc-input::placeholder {
+  color: rgba(255,255,255,0.45);
+}
+
+.pc-badge {
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  border-radius: 999px;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.78rem;
+  color: var(--pc-muted);
+}
+
+.pc-title {
+  letter-spacing: -0.02em;
+}
+
+.pc-card {
+  border-radius: var(--pc-radius);
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+}
+
+.pc-divider {
+  height: 1px;
+  background: rgba(255,255,255,0.10);
+}
+
+.pc-shadow {
+  box-shadow: 0 14px 40px rgba(0,0,0,0.35);
+}
+
+.pc-table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--pc-text);
+  --bs-table-border-color: rgba(255,255,255,0.10);
+}
+
+.pc-table thead th {
+  color: rgba(255,255,255,0.70);
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255,255,255,0.14);
+}
+
+.pc-muted {
+  color: var(--pc-muted);
+}
+
+.pc-link {
+  color: rgba(255,255,255,0.82);
+  text-decoration: none;
+}
+
+.pc-link:hover {
+  color: white;
+  text-decoration: underline;
+}
+
+/* Sweet scrollbar */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.20); }

@@ -1,0 +1,64 @@
+<div class="container py-5">
+  <div class="row g-4 justify-content-center">
+    <div class="col-12 col-lg-8">
+      <div class="pc-card pc-shadow p-4">
+        <div class="d-flex align-items-center justify-content-between gap-2">
+          <div>
+            <div class="h4 m-0 pc-title">Crear cuenta</div>
+            <div class="pc-muted">En menos de un minuto.</div>
+          </div>
+          <a routerLink="/login" class="btn btn-outline-light pc-btn"><i class="bi bi-arrow-left"></i> Volver</a>
+        </div>
+
+        <div class="pc-divider my-3"></div>
+
+        <form [formGroup]="form" (ngSubmit)="submit()" class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Nombre</label>
+            <input class="form-control pc-input" formControlName="nombre" placeholder="Tu nombre" />
+            @if (form.controls.nombre.touched && form.controls.nombre.invalid) {
+              <div class="text-warning small mt-1">Tu nombre es obligatorio.</div>
+            }
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Correo</label>
+            <input class="form-control pc-input" type="email" formControlName="email" placeholder="tu@correo.com" />
+            @if (form.controls.email.touched && form.controls.email.invalid) {
+              <div class="text-warning small mt-1">Correo inválido.</div>
+            }
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Contraseña</label>
+            <input class="form-control pc-input" type="password" formControlName="password" placeholder="Mínimo 6 caracteres" />
+            @if (form.controls.password.touched && form.controls.password.invalid) {
+              <div class="text-warning small mt-1">Mínimo 6 caracteres.</div>
+            }
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">CURP (opcional)</label>
+            <input class="form-control pc-input" formControlName="curp" placeholder="AAAA000000HDFXXX00" />
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Teléfono (opcional)</label>
+            <input class="form-control pc-input" formControlName="telefonoCelular" placeholder="55 0000 0000" />
+          </div>
+
+          <div class="col-12 d-flex gap-2 justify-content-end">
+            <button class="btn btn-primary pc-btn" [disabled]="busy()">
+              @if (busy()) { <span class="spinner-border spinner-border-sm me-2"></span> }
+              Crear cuenta
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="pc-muted small mt-3">
+        Al crear la cuenta aceptas los Términos y la Política de privacidad (demo).
+      </div>
+    </div>
+  </div>
+</div>

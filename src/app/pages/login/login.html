@@ -1,0 +1,100 @@
+<div class="container py-5">
+  <div class="row g-4 align-items-stretch">
+    <div class="col-12 col-lg-6">
+      <div class="pc-card pc-shadow p-4 h-100">
+        <div class="d-flex align-items-center gap-2 mb-3">
+          <div class="pc-auth-logo">
+            <i class="bi bi-heart-pulse"></i>
+          </div>
+          <div>
+            <div class="h4 m-0 pc-title">PetCare</div>
+            <div class="pc-muted small">Plataforma integral para tu mascota</div>
+          </div>
+        </div>
+
+        <div class="pc-divider my-3"></div>
+
+        <form [formGroup]="form" (ngSubmit)="submit()" class="d-grid gap-3">
+          <div>
+            <label class="form-label">Correo</label>
+            <input class="form-control pc-input" type="email" formControlName="email" placeholder="tu@correo.com" />
+            @if (form.controls.email.touched && form.controls.email.invalid) {
+              <div class="text-warning small mt-1">Ingresa un correo válido.</div>
+            }
+          </div>
+
+          <div>
+            <label class="form-label">Contraseña</label>
+            <input class="form-control pc-input" type="password" formControlName="password" placeholder="••••••••" />
+            @if (form.controls.password.touched && form.controls.password.invalid) {
+              <div class="text-warning small mt-1">La contraseña es obligatoria.</div>
+            }
+          </div>
+
+          <button class="btn btn-primary pc-btn" [disabled]="busy()">
+            @if (busy()) { <span class="spinner-border spinner-border-sm me-2"></span> }
+            Entrar
+          </button>
+
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="pc-muted small">¿No tienes cuenta?</div>
+            <a routerLink="/registro" class="btn btn-outline-light pc-btn">Crear cuenta</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+      <div class="pc-card pc-shadow p-4 h-100">
+        <div class="h4 pc-title">Todo en un solo lugar</div>
+        <div class="pc-muted">Administra tu comunidad y el cuidado de tus mascotas con estilo.</div>
+
+        <div class="row g-3 mt-3">
+          <div class="col-12 col-md-6">
+            <div class="pc-surface p-3 h-100">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-heart text-info"></i>
+                <div class="fw-semibold">Mascotas</div>
+              </div>
+              <div class="pc-muted small mt-1">Perfil, fotos, tratamientos y rastreo.</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="pc-surface p-3 h-100">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-house-heart text-success"></i>
+                <div class="fw-semibold">Adopciones</div>
+              </div>
+              <div class="pc-muted small mt-1">Publica y solicita adopciones con seguimiento.</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="pc-surface p-3 h-100">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-cash-coin text-warning"></i>
+                <div class="fw-semibold">Finanzas</div>
+              </div>
+              <div class="pc-muted small mt-1">Gastos, presupuestos y control mensual.</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="pc-surface p-3 h-100">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-people text-primary"></i>
+                <div class="fw-semibold">Red vecinal</div>
+              </div>
+              <div class="pc-muted small mt-1">Alertas y comunidad por colonia.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pc-divider my-4"></div>
+
+        <div class="pc-muted small">Tip: Para conectarte al backend desplegado, usa:</div>
+        <div class="pc-surface p-3 mt-2">
+          <div class="small"><code>npm run start:remote</code></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

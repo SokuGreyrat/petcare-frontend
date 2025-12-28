@@ -1,0 +1,86 @@
+<div class="pc-shell">
+  <aside class="pc-nav" [class.collapsed]="collapsed()">
+    <div class="pc-nav-head">
+      <div class="d-flex align-items-center gap-2">
+        <div class="pc-logo">
+          <i class="bi bi-heart-pulse"></i>
+        </div>
+        <div>
+          <div class="fw-semibold pc-title">PetCare</div>
+          <div class="small pc-muted">Tu comunidad, tus mascotas</div>
+        </div>
+      </div>
+      <button class="btn btn-sm btn-outline-light pc-btn d-md-none" (click)="toggleNav()">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+
+    <div class="pc-nav-user pc-surface-2">
+      <div class="pc-avatar">
+        @if (auth.user()?.fotoPerfil) {
+          <img [src]="auth.user()?.fotoPerfil" alt="Foto perfil" />
+        } @else {
+          <span>{{ avatar() }}</span>
+        }
+      </div>
+      <div class="flex-grow-1">
+        <div class="fw-semibold">{{ user()?.nombre }}</div>
+        <div class="small pc-muted">{{ user()?.email }}</div>
+      </div>
+      <button class="btn btn-sm btn-outline-light pc-btn" (click)="auth.logout()" title="Salir">
+        <i class="bi bi-box-arrow-right"></i>
+      </button>
+    </div>
+
+    <nav class="pc-nav-links">
+      <a routerLink="/dashboard" routerLinkActive="active" (click)="closeNav()">
+        <i class="bi bi-grid"></i>
+        <span>Dashboard</span>
+      </a>
+      <a routerLink="/mis-mascotas" routerLinkActive="active" (click)="closeNav()">
+        <i class="bi bi-heart"></i>
+        <span>Mascotas</span>
+      </a>
+      <a routerLink="/adopciones" routerLinkActive="active" (click)="closeNav()">
+        <i class="bi bi-house-heart"></i>
+        <span>Adopciones</span>
+      </a>
+      <a routerLink="/finanzas" routerLinkActive="active" (click)="closeNav()">
+        <i class="bi bi-cash-coin"></i>
+        <span>Finanzas</span>
+      </a>
+      <a routerLink="/red-vecinal" routerLinkActive="active" (click)="closeNav()">
+        <i class="bi bi-people"></i>
+        <span>Red vecinal</span>
+      </a>
+      <a routerLink="/perfil" routerLinkActive="active" (click)="closeNav()">
+        <i class="bi bi-person"></i>
+        <span>Perfil</span>
+      </a>
+    </nav>
+
+    <div class="pc-nav-foot small pc-muted">
+      <div class="pc-badge">v1.0 · Beta</div>
+      <div class="mt-2">Hecho para lanzamiento</div>
+    </div>
+  </aside>
+
+  <div class="pc-main">
+    <header class="pc-topbar pc-surface">
+      <button class="btn btn-outline-light pc-btn d-md-none" (click)="toggleNav()">
+        <i class="bi bi-list"></i>
+      </button>
+      <div class="flex-grow-1">
+        <div class="fw-semibold pc-title">{{ (user()?.nombre || 'Usuario') }}</div>
+        <div class="small pc-muted">Bienvenido de vuelta ✨</div>
+      </div>
+      <a class="btn btn-outline-light pc-btn" routerLink="/dashboard">
+        <i class="bi bi-bell"></i>
+      </a>
+    </header>
+
+    <main class="pc-content">
+      <router-outlet />
+    </main>
+  </div>
+</div>

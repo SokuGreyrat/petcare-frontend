@@ -1,0 +1,163 @@
+<div class="d-flex align-items-center justify-content-between gap-2">
+  <div>
+    <div class="h3 m-0 pc-title">Dashboard</div>
+    <div class="pc-muted">Tu feed general y novedades.</div>
+  </div>
+  <button class="btn btn-primary pc-btn" (click)="openCreate()">
+    <i class="bi bi-plus-lg me-1"></i>
+    Nuevo post
+  </button>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-12 col-xl-8">
+    <div class="d-grid gap-3">
+      @if (busy()) {
+        <div class="pc-card p-4">
+          <span class="spinner-border spinner-border-sm me-2"></span>
+          Cargando...
+        </div>
+      }
+
+      @if (feed().length === 0 && !busy()) {
+        <div class="pc-card p-4">
+          <div class="h5 pc-title">Todavía no hay publicaciones</div>
+          <div class="pc-muted">Crea tu primer post para comenzar.</div>
+          <div class="mt-3">
+            <button class="btn btn-outline-light pc-btn" (click)="openCreate()">
+              <i class="bi bi-plus-lg me-1"></i>
+              Publicar
+            </button>
+          </div>
+        </div>
+      }
+
+      @for (p of feed(); track p.id) {
+        <div class="pc-card pc-shadow p-3">
+          <div class="d-flex gap-2 align-items-start">
+            <div class="pc-post-avatar">
+              @if (userPhoto(p.usuarioId)) {
+                <img [src]="userPhoto(p.usuarioId)" alt="" />
+              } @else {
+                <i class="bi bi-person"></i>
+              }
+            </div>
+            <div class="flex-grow-1">
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="fw-semibold">{{ userName(p.usuarioId) }}</div>
+                  <div class="small pc-muted">{{ format(p.createdAt) }}</div>
+                </div>
+                <span class="pc-badge"><i class="bi bi-globe2 me-1"></i> General</span>
+              </div>
+              <div class="mt-2" style="white-space: pre-wrap;">{{ p.contenido }}</div>
+
+              @if (p.imagen) {
+                <div class="mt-3">
+                  <img class="pc-post-img" [src]="p.imagen" alt="Imagen" />
+                </div>
+              }
+
+              @if (postImages(p.id).length > 0) {
+                <div class="pc-post-grid mt-2">
+                  @for (im of postImages(p.id); track im.id) {
+                    <img [src]="im.imagePath" alt="" />
+                  }
+                </div>
+              }
+
+              <div class="d-flex flex-wrap gap-2 mt-3">
+                <button class="btn btn-outline-light pc-btn" (click)="toggleLike(p)">
+                  <i class="bi" [class.bi-heart-fill]="isLikedByMe(p.id)" [class.bi-heart]="!isLikedByMe(p.id)"></i>
+                  <span class="ms-1">{{ likesCount(p.id) }}</span>
+                </button>
+
+                <button class="btn btn-outline-light pc-btn" (click)="toggleComments(p.id)">
+                  <i class="bi bi-chat"></i>
+                  <span class="ms-1">{{ commentsFor(p.id).length }}</span>
+                </button>
+
+                <button class="btn btn-outline-light pc-btn" (click)="reload()">
+                  <i class="bi bi-arrow-clockwise"></i>
+                </button>
+              </div>
+
+              @if (expandedComments()[p.id || -1]) {
+                <div class="pc-divider my-3"></div>
+                <div class="d-grid gap-2">
+                  @for (c of commentsFor(p.id); track c.id) {
+                    <div class="pc-surface p-2">
+                      <div class="d-flex align-items-center justify-content-between">
+                        <div class="small fw-semibold">{{ userName(c.userId) }}</div>
+                        <div class="small pc-muted">{{ format(c.fechaCreacion) }}</div>
+                      </div>
+                      <div class="small" style="white-space: pre-wrap;">{{ c.contenido }}</div>
+                    </div>
+                  }
+                </div>
+
+                <form class="mt-3" [formGroup]="commentForms()[p.id || -1]" (ngSubmit)="submitComment(p.id!)">
+                  <div class="d-flex gap-2">
+                    <input class="form-control pc-input" formControlName="contenido" placeholder="Escribe un comentario…" />
+                    <button class="btn btn-primary pc-btn" type="submit"><i class="bi bi-send"></i></button>
+                  </div>
+                </form>
+              }
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="col-12 col-xl-4">
+    <div class="pc-card pc-shadow p-3 mb-3">
+      <div class="h5 pc-title">Estado rápido</div>
+      <div class="pc-muted small">Datos del feed (global)</div>
+      <div class="pc-divider my-3"></div>
+      <div class="d-grid gap-2">
+        <div class="d-flex justify-content-between"><span class="pc-muted">Posts</span><span class="fw-semibold">{{ posts().length }}</span></div>
+        <div class="d-flex justify-content-between"><span class="pc-muted">Likes</span><span class="fw-semibold">{{ likes().length }}</span></div>
+        <div class="d-flex justify-content-between"><span class="pc-muted">Comentarios</span><span class="fw-semibold">{{ comments().length }}</span></div>
+      </div>
+    </div>
+
+    <div class="pc-card pc-shadow p-3">
+      <div class="h5 pc-title">Tips</div>
+      <div class="pc-muted small">Este front usa URLs para imágenes. Puedes pegar links de Google Drive, Imgur, etc.</div>
+      <div class="pc-divider my-3"></div>
+      <div class="pc-muted small">
+        Si tu backend está en Render, corre:
+        <div class="mt-2 pc-surface p-2"><code>npm run start:remote</code></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<app-modal [open]="showCreate()" title="Nuevo post" (closed)="showCreate.set(false)">
+  <form [formGroup]="createForm" (ngSubmit)="createPost()" class="d-grid gap-3">
+    <div>
+      <label class="form-label">Contenido</label>
+      <textarea class="form-control pc-input" rows="4" formControlName="contenido" placeholder="¿Qué pasó hoy con tu mascota?" ></textarea>
+      @if (createForm.controls.contenido.touched && createForm.controls.contenido.invalid) {
+        <div class="text-warning small mt-1">Escribe al menos 2 caracteres.</div>
+      }
+    </div>
+
+    <div class="row g-2">
+      <div class="col-12">
+        <label class="form-label">Imagen principal (URL, opcional)</label>
+        <input class="form-control pc-input" formControlName="imagen" placeholder="https://..." />
+      </div>
+      <div class="col-12">
+        <label class="form-label">Galería (URLs, una por línea, opcional)</label>
+        <textarea class="form-control pc-input" rows="3" formControlName="extraImages" placeholder="https://...\nhttps://..." ></textarea>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2">
+      <button type="button" class="btn btn-outline-light pc-btn" (click)="showCreate.set(false)">Cancelar</button>
+      <button class="btn btn-primary pc-btn" type="submit">Publicar</button>
+    </div>
+  </form>
+</app-modal>

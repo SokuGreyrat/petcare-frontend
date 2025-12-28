@@ -1,0 +1,23 @@
+.alerta {
+  border: 1px solid rgba(255, 193, 7, 0.25);
+  background: rgba(255, 193, 7, 0.08);
+}
+
+.pc-post-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.pc-post-grid img {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+@media (max-width: 768px) {
+  .pc-post-grid { grid-template-columns: repeat(2, 1fr); }
+  .pc-post-grid img { height: 120px; }
+}

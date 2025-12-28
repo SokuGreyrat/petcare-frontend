@@ -1,0 +1,14 @@
+.pc-auth-logo {
+  width: 54px;
+  height: 54px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  font-size: 1.4rem;
+  background: radial-gradient(circle at 20% 0%, rgba(124, 92, 255, 0.95), rgba(44, 224, 197, 0.55));
+  border: 1px solid rgba(255,255,255,0.16);
+}
+
+code {
+  color: rgba(255,255,255,0.86);
+}
