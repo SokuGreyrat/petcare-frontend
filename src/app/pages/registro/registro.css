@@ -1,1 +1,108 @@
+.pc-auth-page { position: relative; }
+
+.pc-auth-shell{
+  max-width: 980px;
+  margin: 0 auto;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.pc-auth-grid{
+  display: grid;
+  grid-template-columns: 1.15fr .85fr;
+}
+
+@media (max-width: 991.98px){
+  .pc-auth-grid{ grid-template-columns: 1fr; }
+  .pc-auth-right{ border-top: 1px solid rgba(255,255,255,.08); }
+}
+
+.pc-auth-left{ background: rgba(255,255,255,.02); }
+.pc-auth-right{
+  position: relative;
+  background: rgba(255,255,255,.03);
+  border-left: 1px solid rgba(255,255,255,.08);
+  overflow: hidden;
+}
+
+.pc-auth-right::before{
+  content:"";
+  position:absolute;
+  inset:-140px -140px auto auto;
+  width:320px; height:320px;
+  background: radial-gradient(circle, rgba(109,94,252,.35), transparent 60%);
+  pointer-events:none;
+}
+
+.pc-auth-right::after{
+  content:"";
+  position:absolute;
+  inset:auto auto -160px -160px;
+  width:360px; height:360px;
+  background: radial-gradient(circle, rgba(35,184,255,.20), transparent 60%);
+  pointer-events:none;
+}
+
+.pc-input-ico{
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: .7;
+}
+
+.pc-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 10px;
+  border-radius:999px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.10);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.pc-feature{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  padding:12px;
+  border-radius:14px;
+  background: rgba(0,0,0,.18);
+  border: 1px solid rgba(255,255,255,.08);
+  transition: transform .15s ease, border-color .15s ease, background .15s ease;
+}
+
+.pc-feature:hover{
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,.18);
+  background: rgba(0,0,0,.22);
+}
+
+.pc-feature-ico{
+  width:36px; height:36px;
+  border-radius:12px;
+  display:flex; align-items:center; justify-content:center;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.10);
+}
+
+.pc-quote{
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.08);
+  font-style: italic;
+}
+
+.pc-link{
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  color: rgba(255,255,255,.85);
+}
+
+.pc-btn-sm{ padding: .35rem .75rem; border-radius: 12px; }
+.pc-btn-lg{ padding: .75rem 1rem; border-radius: 14px; }
 /* Extra spacing tweaks can go here */

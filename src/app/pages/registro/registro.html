@@ -1,63 +1,148 @@
-<div class="container py-5">
-  <div class="row g-4 justify-content-center">
-    <div class="col-12 col-lg-8">
-      <div class="pc-card pc-shadow p-4">
-        <div class="d-flex align-items-center justify-content-between gap-2">
-          <div>
-            <div class="h4 m-0 pc-title">Crear cuenta</div>
-            <div class="pc-muted">En menos de un minuto.</div>
-          </div>
-          <a routerLink="/login" class="btn btn-outline-light pc-btn"><i class="bi bi-arrow-left"></i> Volver</a>
-        </div>
+<div class="pc-auth-page">
+  <div class="container py-5">
+    <div class="pc-auth-shell pc-card pc-shadow">
+      <div class="pc-auth-grid">
+        <!-- LEFT: FORM -->
+        <section class="pc-auth-left p-4 p-lg-5">
+          <div class="d-flex align-items-center justify-content-between mb-4">
+            <div class="d-flex align-items-center gap-3">
+              <div class="pc-auth-logo">
+                <i class="bi bi-heart-pulse"></i>
+              </div>
+              <div>
+                <div class="h4 m-0 pc-title">Crear cuenta</div>
+                <div class="pc-muted small">En menos de un minuto.</div>
+              </div>
+            </div>
 
-        <div class="pc-divider my-3"></div>
-
-        <form [formGroup]="form" (ngSubmit)="submit()" class="row g-3">
-          <div class="col-12">
-            <label class="form-label">Nombre</label>
-            <input class="form-control pc-input" formControlName="nombre" placeholder="Tu nombre" />
-            @if (form.controls.nombre.touched && form.controls.nombre.invalid) {
-              <div class="text-warning small mt-1">Tu nombre es obligatorio.</div>
-            }
-          </div>
-
-          <div class="col-12 col-md-6">
-            <label class="form-label">Correo</label>
-            <input class="form-control pc-input" type="email" formControlName="email" placeholder="tu@correo.com" />
-            @if (form.controls.email.touched && form.controls.email.invalid) {
-              <div class="text-warning small mt-1">Correo inválido.</div>
-            }
+            <a routerLink="/login" class="btn btn-outline-light pc-btn pc-btn-sm">
+              <i class="bi bi-arrow-left me-1"></i> Volver
+            </a>
           </div>
 
-          <div class="col-12 col-md-6">
-            <label class="form-label">Contraseña</label>
-            <input class="form-control pc-input" type="password" formControlName="password" placeholder="Mínimo 6 caracteres" />
-            @if (form.controls.password.touched && form.controls.password.invalid) {
-              <div class="text-warning small mt-1">Mínimo 6 caracteres.</div>
-            }
-          </div>
+          <div class="pc-divider mb-4"></div>
 
-          <div class="col-12 col-md-6">
-            <label class="form-label">CURP (opcional)</label>
-            <input class="form-control pc-input" formControlName="curp" placeholder="AAAA000000HDFXXX00" />
-          </div>
+          <form [formGroup]="form" (ngSubmit)="submit()" class="d-grid gap-3">
+            <!-- Nombre -->
+            <div>
+              <label class="form-label">Nombre</label>
+              <div class="position-relative">
+                <i class="bi bi-person pc-input-ico"></i>
+                <input class="form-control pc-input ps-5" formControlName="nombre" placeholder="Tu nombre" />
+              </div>
+              @if (form.controls.nombre?.touched && form.controls.nombre?.invalid) {
+                <div class="text-warning small mt-1">El nombre es obligatorio.</div>
+              }
+            </div>
 
-          <div class="col-12 col-md-6">
-            <label class="form-label">Teléfono (opcional)</label>
-            <input class="form-control pc-input" formControlName="telefonoCelular" placeholder="55 0000 0000" />
-          </div>
+            <div class="row g-3">
+              <!-- Correo -->
+              <div class="col-12 col-md-6">
+                <label class="form-label">Correo</label>
+                <div class="position-relative">
+                  <i class="bi bi-envelope pc-input-ico"></i>
+                  <input class="form-control pc-input ps-5" type="email" formControlName="email" placeholder="tu@correo.com" />
+                </div>
+                @if (form.controls.email?.touched && form.controls.email?.invalid) {
+                  <div class="text-warning small mt-1">Ingresa un correo válido.</div>
+                }
+              </div>
 
-          <div class="col-12 d-flex gap-2 justify-content-end">
-            <button class="btn btn-primary pc-btn" [disabled]="busy()">
+              <!-- Contraseña -->
+              <div class="col-12 col-md-6">
+                <label class="form-label">Contraseña</label>
+                <div class="position-relative">
+                  <i class="bi bi-lock pc-input-ico"></i>
+                  <input class="form-control pc-input ps-5" type="password" formControlName="password" placeholder="Mínimo 6 caracteres" />
+                </div>
+                <div class="pc-muted small mt-1">Tip: usa letras + números para una mejor seguridad.</div>
+                @if (form.controls.password?.touched && form.controls.password?.invalid) {
+                  <div class="text-warning small mt-1">La contraseña es obligatoria.</div>
+                }
+              </div>
+            </div>
+
+            <div class="row g-3">
+              <!-- CURP -->
+              <div class="col-12 col-md-6">
+                <label class="form-label">CURP <span class="pc-muted">(opcional)</span></label>
+                <div class="position-relative">
+                  <i class="bi bi-person-vcard pc-input-ico"></i>
+                  <input class="form-control pc-input ps-5" formControlName="curp" placeholder="AAAA000000HDFXXX00" />
+                </div>
+              </div>
+
+              <!-- Teléfono -->
+              <div class="col-12 col-md-6">
+                <label class="form-label">Teléfono <span class="pc-muted">(opcional)</span></label>
+                <div class="position-relative">
+                  <i class="bi bi-telephone pc-input-ico"></i>
+                  <input class="form-control pc-input ps-5" formControlName="telefono" placeholder="55 0000 0000" />
+                </div>
+              </div>
+            </div>
+
+            <button class="btn btn-primary pc-btn pc-btn-lg mt-2" [disabled]="busy()">
               @if (busy()) { <span class="spinner-border spinner-border-sm me-2"></span> }
               Crear cuenta
             </button>
-          </div>
-        </form>
-      </div>
 
-      <div class="pc-muted small mt-3">
-        Al crear la cuenta aceptas los Términos y la Política de privacidad (demo).
+            <div class="pc-muted small mt-2">
+              Al crear la cuenta aceptas los <span class="pc-link">Términos</span> y la <span class="pc-link">Política de privacidad</span>.
+            </div>
+          </form>
+        </section>
+
+        <!-- RIGHT: BENEFITS -->
+        <aside class="pc-auth-right p-4 p-lg-5">
+          <div class="pc-badge mb-3">
+            <i class="bi bi-stars"></i> Experiencia PetCare+
+          </div>
+
+          <div class="h5 pc-title mb-2">Tu cuenta abre todo</div>
+          <div class="pc-muted mb-4">
+            Administra tus mascotas, controla gastos y conéctate con tu colonia con una interfaz moderna.
+          </div>
+
+          <div class="d-grid gap-3">
+            <div class="pc-feature">
+              <div class="pc-feature-ico"><i class="bi bi-heart text-info"></i></div>
+              <div>
+                <div class="fw-semibold">Mascotas</div>
+                <div class="pc-muted small">Tratamientos, fotos y rastreo.</div>
+              </div>
+            </div>
+
+            <div class="pc-feature">
+              <div class="pc-feature-ico"><i class="bi bi-house-heart text-success"></i></div>
+              <div>
+                <div class="fw-semibold">Adopciones</div>
+                <div class="pc-muted small">Publica y solicita en minutos.</div>
+              </div>
+            </div>
+
+            <div class="pc-feature">
+              <div class="pc-feature-ico"><i class="bi bi-cash-coin text-warning"></i></div>
+              <div>
+                <div class="fw-semibold">Finanzas</div>
+                <div class="pc-muted small">Presupuesto vs gastos del mes.</div>
+              </div>
+            </div>
+
+            <div class="pc-feature">
+              <div class="pc-feature-ico"><i class="bi bi-people text-primary"></i></div>
+              <div>
+                <div class="fw-semibold">Red vecinal</div>
+                <div class="pc-muted small">Alertas y posts por colonia.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pc-quote mt-4">
+            “Me ayudó a llevar el control de mi mascota y conocer gente de mi colonia.”
+            <div class="pc-muted small mt-1">— Usuario PetCare+</div>
+          </div>
+        </aside>
       </div>
     </div>
   </div>
