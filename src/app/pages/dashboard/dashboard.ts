@@ -50,6 +50,17 @@ export class Dashboard {
     this.reload();
   }
 
+  /** ✅ Obtiene el id del usuario logueado aunque venga como idUsuario/usuarioId */
+  private meId(): number {
+    try {
+      const me: any = this.auth.requireUser();
+      const id = Number(me?.id ?? me?.idUsuario ?? me?.usuarioId ?? 0);
+      return Number.isFinite(id) ? id : 0;
+    } catch {
+      return 0;
+    }
+  }
+
   reload(): void {
     this.busy.set(true);
     const done = () => this.busy.set(false);
@@ -64,14 +75,23 @@ export class Dashboard {
     this.api.getPostImages().subscribe({ next: (v) => this.images.set(v || []), complete: done, error: done });
   }
 
+  private userIdOf(u: Usuario): number {
+    const anyU: any = u as any;
+    return Number(anyU.id ?? anyU.idUsuario ?? anyU.usuarioId ?? 0);
+  }
+
   userName(userId: number): string {
-    const u = this.users().find((x) => x.id === userId);
-    return u?.nombre || `Usuario #${userId}`;
+    const me = this.meId();
+    if (me && userId === me) return 'Tú';
+    const u = this.users().find((x) => this.userIdOf(x) === userId);
+    const anyU: any = u as any;
+    return anyU?.nombre ?? `Usuario #${userId}`;
   }
 
   userPhoto(userId: number): string | undefined {
-    const u = this.users().find((x) => x.id === userId);
-    return u?.fotoPerfil || undefined;
+    const u = this.users().find((x) => this.userIdOf(x) === userId);
+    const anyU: any = u as any;
+    return (anyU?.fotoPerfil || anyU?.foto || anyU?.avatarUrl) ?? undefined;
   }
 
   postImages(postId?: number): PostImage[] {
@@ -86,8 +106,9 @@ export class Dashboard {
 
   isLikedByMe(postId?: number): boolean {
     if (!postId) return false;
-    const me = this.auth.requireUser();
-    return this.likes().some((l) => l.postId === postId && l.userId === (me.id || -1));
+    const uid = this.meId();
+    if (!uid) return false;
+    return this.likes().some((l) => l.postId === postId && l.userId === uid);
   }
 
   commentsFor(postId?: number): Comment[] {
@@ -114,9 +135,16 @@ export class Dashboard {
 
   async toggleLike(post: Post): Promise<void> {
     if (!post.id) return;
-    const me = this.auth.requireUser();
-    const existing = this.likes().find((l) => l.postId === post.id && l.userId === (me.id || -1));
 
+    const uid = this.meId();
+    if (!uid) {
+      this.toast.show('Sesión inválida: no se encontró idUsuario.', 'danger');
+      return;
+    }
+
+    const existing = this.likes().find((l) => l.postId === post.id && l.userId === uid);
+
+    // Quitar like
     if (existing?.id) {
       this.api.deleteLike(existing.id).subscribe({
         next: () => {
@@ -127,7 +155,8 @@ export class Dashboard {
       return;
     }
 
-    this.api.createLike({ postId: post.id, userId: me.id! }).subscribe({
+    // Dar like
+    this.api.createLike({ postId: post.id, userId: uid }).subscribe({
       next: (created) => {
         this.likes.update((arr) => [created, ...arr]);
       },
@@ -141,12 +170,19 @@ export class Dashboard {
       form?.markAllAsTouched();
       return;
     }
-    const me = this.auth.requireUser();
+
+    const uid = this.meId();
+    if (!uid) {
+      this.toast.show('Sesión inválida: no se encontró idUsuario.', 'danger');
+      return;
+    }
+
     const body: Comment = {
       postId,
-      userId: me.id!,
+      userId: uid,
       contenido: form.value.contenido!,
     };
+
     this.api.createComment(body).subscribe({
       next: (created) => {
         this.comments.update((arr) => [...arr, created]);
@@ -167,7 +203,12 @@ export class Dashboard {
       return;
     }
 
-    const me = this.auth.requireUser();
+    const uid = this.meId();
+    if (!uid) {
+      this.toast.show('Sesión inválida: no se encontró idUsuario.', 'danger');
+      return;
+    }
+
     const contenido = this.createForm.value.contenido!;
     const imagen = (this.createForm.value.imagen || '').trim() || null;
     const extra = (this.createForm.value.extraImages || '')
@@ -179,7 +220,7 @@ export class Dashboard {
     const body: Post = {
       contenido,
       imagen,
-      usuarioId: me.id!,
+      usuarioId: uid,
       coloniaId: null,
       createdAt: toLocalDateString(),
     };
@@ -187,14 +228,16 @@ export class Dashboard {
     this.api.createPost(body).subscribe({
       next: (created) => {
         this.posts.update((arr) => [created, ...arr]);
+
         // extra images as post_images
         if (created.id && extra.length) {
           extra.forEach((url) => {
-            this.api.createPostImage({ postId: created.id!, usuarioId: me.id!, imagePath: url }).subscribe({
+            this.api.createPostImage({ postId: created.id!, usuarioId: uid, imagePath: url }).subscribe({
               next: (im) => this.images.update((arr) => [im, ...arr]),
             });
           });
         }
+
         this.toast.show('Post publicado.', 'success');
         this.showCreate.set(false);
       },

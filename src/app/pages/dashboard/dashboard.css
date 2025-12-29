@@ -1,42 +1,118 @@
-.pc-post-avatar {
-  width: 46px;
-  height: 46px;
-  border-radius: 999px;
-  overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.18);
-  display: grid;
-  place-items: center;
-  background: rgba(255,255,255,0.06);
+.pc-page-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
 }
 
-.pc-post-avatar img {
+.pc-sidebar{
+  position: sticky;
+  top: 16px;
+}
+
+.pc-icon{
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display:grid;
+  place-items:center;
+  border-radius: 999px;
+}
+
+.pc-pill{
+  border-radius: 999px;
+}
+
+.pc-post-avatar{
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.05);
+  display:grid;
+  place-items:center;
+  flex: 0 0 auto;
+}
+
+.pc-post-avatar img{
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.pc-post-img {
+.pc-badge{
+  font-size: .8rem;
+  padding: .35rem .65rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.12);
+  white-space: nowrap;
+}
+
+.pc-post-img{
   width: 100%;
-  max-height: 360px;
+  max-height: 420px;
   object-fit: cover;
   border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.14);
+  border: 1px solid rgba(255,255,255,.12);
 }
 
-.pc-post-grid {
-  display: grid;
+.pc-post-grid{
+  display:grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  gap: 10px;
 }
 
-.pc-post-grid img {
+.pc-post-grid img{
   width: 100%;
   height: 110px;
   object-fit: cover;
   border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,.12);
 }
 
-@media (max-width: 768px) {
-  .pc-post-grid { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 576px){
+  .pc-post-grid{ grid-template-columns: repeat(2, 1fr); }
+  .pc-post-grid img{ height: 130px; }
+}
+
+.pc-kpi{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.pc-kpi-item{
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.10);
+}
+
+.pc-kpi-item .label{
+  font-size: .85rem;
+  color: rgba(255,255,255,.65);
+}
+
+.pc-kpi-item .value{
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.pc-empty{
+  text-align: center;
+}
+
+.pc-empty-icon{
+  width: 54px;
+  height: 54px;
+  margin: 0 auto;
+  border-radius: 18px;
+  display:grid;
+  place-items:center;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.05);
+  font-size: 1.4rem;
 }
