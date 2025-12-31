@@ -1,193 +1,246 @@
-<div class="d-flex align-items-center justify-content-between gap-2">
-  <div>
-    <div class="h3 m-0 pc-title">Adopciones</div>
-    <div class="pc-muted">Publica, explora y da seguimiento a solicitudes.</div>
-  </div>
-  <div class="d-flex gap-2">
-    <button class="btn btn-outline-light pc-btn" (click)="reload()"><i class="bi bi-arrow-clockwise"></i></button>
-    <button class="btn btn-primary pc-btn" (click)="openPublish()"><i class="bi bi-plus-lg me-1"></i>Publicar</button>
-  </div>
+<!-- Toast -->
+<div class="toast-top" *ngIf="toastVisible">
+  {{ toastMsg }}
 </div>
 
-<div class="d-flex flex-wrap gap-2 mt-3">
-  <button class="btn btn-outline-light pc-btn" [class.active]="tab() === 'explorar'" (click)="tab.set('explorar')"><i class="bi bi-search me-1"></i>Explorar</button>
-  <button class="btn btn-outline-light pc-btn" [class.active]="tab() === 'misPublicaciones'" (click)="tab.set('misPublicaciones')"><i class="bi bi-megaphone me-1"></i>Mis publicaciones</button>
-  <button class="btn btn-outline-light pc-btn" [class.active]="tab() === 'misSolicitudes'" (click)="tab.set('misSolicitudes')"><i class="bi bi-inbox me-1"></i>Mis solicitudes</button>
-</div>
+<div class="adopciones-page">
+  <div class="topbar">
+    <div>
+      <h1>Adopciones</h1>
+      <p class="sub">Publica, explora y da seguimiento a solicitudes.</p>
 
-<div class="row g-3 mt-1">
-  <div class="col-12 col-xl-8">
-    @if (tab() === 'explorar') {
-      <div class="d-grid gap-3">
-        @if (available().length === 0) {
-          <div class="pc-card pc-shadow p-4">
-            <div class="h5 pc-title">No hay adopciones disponibles</div>
-            <div class="pc-muted">Vuelve más tarde o publica una adopción.</div>
-          </div>
-        }
-
-        @for (a of available(); track a.id) {
-          <div class="pc-card pc-shadow p-3">
-            <div class="d-flex align-items-start justify-content-between gap-2">
-              <div>
-                <div class="h5 m-0 pc-title">{{ petName(a.mascotaId) }}</div>
-                <div class="pc-muted">{{ petInfo(a.mascotaId) }}</div>
-                <div class="small pc-muted mt-1">Publicado por {{ ownerName(a.usuarioPublicadorId) }} · {{ format(a.fechaPublicacion) }}</div>
-              </div>
-              <span class="pc-badge"><i class="bi bi-check2-circle me-1"></i>Disponible</span>
-            </div>
-            <div class="pc-divider my-3"></div>
-            <div class="d-flex justify-content-end">
-              @if (a.usuarioPublicadorId === me().id) {
-                <span class="pc-muted small">Esta adopción es tuya.</span>
-              } @else {
-                <button class="btn btn-primary pc-btn" (click)="openRequest(a)"><i class="bi bi-send me-1"></i>Solicitar</button>
-              }
-            </div>
-          </div>
-        }
+      <div class="tabs">
+        <button class="tab" [class.active]="vista==='explorar'" (click)="setVista('explorar')">
+          Explorar
+        </button>
+        <button class="tab" [class.active]="vista==='misPublicaciones'" (click)="setVista('misPublicaciones')">
+          Mis publicaciones
+        </button>
+        <button class="tab" [class.active]="vista==='misSolicitudes'" (click)="setVista('misSolicitudes')">
+          Mis solicitudes
+        </button>
       </div>
-    }
+    </div>
 
-    @if (tab() === 'misPublicaciones') {
-      <div class="d-grid gap-3">
-        @if (myPublications().length === 0) {
-          <div class="pc-card pc-shadow p-4">
-            <div class="h5 pc-title">No has publicado adopciones</div>
-            <div class="pc-muted">Publica una adopción para empezar.</div>
-          </div>
-        }
-
-        @for (a of myPublications(); track a.id) {
-          <div class="pc-card pc-shadow p-3">
-            <div class="d-flex align-items-start justify-content-between gap-2">
-              <div>
-                <div class="h5 m-0 pc-title">{{ petName(a.mascotaId) }}</div>
-                <div class="pc-muted">{{ petInfo(a.mascotaId) }}</div>
-                <div class="small pc-muted mt-1">{{ format(a.fechaPublicacion) }}</div>
-              </div>
-              <div class="d-flex gap-2">
-                <button class="btn btn-outline-light pc-btn" (click)="toggleDisponible(a)">
-                  @if (a.disponible) { <i class="bi bi-toggle-on"></i> } @else { <i class="bi bi-toggle-off"></i> }
-                  <span class="ms-1">{{ a.disponible ? 'Activa' : 'Pausada' }}</span>
-                </button>
-                <button class="btn btn-outline-danger pc-btn" (click)="deleteAdopcion(a)"><i class="bi bi-trash"></i></button>
-              </div>
-            </div>
-
-            <div class="pc-divider my-3"></div>
-            <div class="fw-semibold mb-2">Solicitudes recibidas</div>
-
-            @if (requestsForAdopcion(a.id).length === 0) {
-              <div class="pc-muted">Todavía no hay solicitudes.</div>
-            } @else {
-              <div class="d-grid gap-2">
-                @for (s of requestsForAdopcion(a.id); track s.id) {
-                  <div class="pc-surface p-3">
-                    <div class="d-flex align-items-start justify-content-between gap-2">
-                      <div>
-                        <div class="fw-semibold">Solicitante #{{ s.solicitanteId }}</div>
-                        <div class="small pc-muted">{{ format(s.fechaSolicitud) }}</div>
-                        @if (s.mensaje) {
-                          <div class="small mt-1" style="white-space: pre-wrap;">{{ s.mensaje }}</div>
-                        }
-                      </div>
-                      <div class="text-end">
-                        <span class="pc-badge">{{ s.estado }}</span>
-                        <div class="d-flex gap-2 mt-2 justify-content-end">
-                          <button class="btn btn-sm btn-outline-light pc-btn" (click)="setEstadoSolicitud(s, 'APROBADA')">Aprobar</button>
-                          <button class="btn btn-sm btn-outline-danger pc-btn" (click)="setEstadoSolicitud(s, 'RECHAZADA')">Rechazar</button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                }
-              </div>
-            }
-          </div>
-        }
-      </div>
-    }
-
-    @if (tab() === 'misSolicitudes') {
-      <div class="d-grid gap-3">
-        @if (myRequests().length === 0) {
-          <div class="pc-card pc-shadow p-4">
-            <div class="h5 pc-title">Aún no has solicitado adopciones</div>
-            <div class="pc-muted">Explora adopciones y envía una solicitud.</div>
-          </div>
-        }
-
-        @for (s of myRequests(); track s.id) {
-          <div class="pc-card pc-shadow p-3">
-            <div class="d-flex align-items-start justify-content-between gap-2">
-              <div>
-                <div class="fw-semibold">Solicitud #{{ s.id }}</div>
-                <div class="small pc-muted">Adopción #{{ s.adopcionId }} · {{ format(s.fechaSolicitud) }}</div>
-                @if (s.mensaje) { <div class="small mt-2" style="white-space: pre-wrap;">{{ s.mensaje }}</div> }
-              </div>
-              <span class="pc-badge">{{ s.estado }}</span>
-            </div>
-          </div>
-        }
-      </div>
-    }
+    <div class="actions">
+      <button class="btn" (click)="refrescarTodo()">⟳</button>
+      <button class="btn primary" (click)="abrirModalPublicar()">+ Publicar</button>
+    </div>
   </div>
 
-  <div class="col-12 col-xl-4">
-    <div class="pc-card pc-shadow p-3">
-      <div class="h5 pc-title">Tu inventario</div>
-      <div class="pc-muted small">Mascotas que puedes publicar</div>
-      <div class="pc-divider my-3"></div>
-      @if (myPets().length === 0) {
-        <div class="pc-muted">No tienes mascotas registradas.</div>
-      } @else {
-        <div class="d-grid gap-2">
-          @for (m of myPets(); track m.id) {
-            <div class="pc-surface p-3">
-              <div class="fw-semibold">{{ m.nombre }}</div>
-              <div class="small pc-muted">{{ m.especie || 'Mascota' }} · {{ m.raza || '—' }}</div>
+  <div class="layout">
+    <!-- LISTA PRINCIPAL -->
+    <div class="left">
+      <div *ngIf="cargando" class="loading">Cargando...</div>
+
+      <!-- Explorar -->
+      <ng-container *ngIf="vista==='explorar'">
+        <div *ngFor="let ad of adopciones" class="card">
+          <div class="card-head">
+            <div class="pet-row">
+              <!-- Foto -->
+              <ng-container *ngIf="getFotoMascota(ad) as foto; else nofoto">
+                <img class="pet-img" [src]="foto" alt="Foto mascota">
+              </ng-container>
+              <ng-template #nofoto>
+                <div class="pet-ph">{{ getNombreMascota(ad).charAt(0) }}</div>
+              </ng-template>
+
+              <!-- Info -->
+              <div class="pet-info">
+                <div class="title">{{ getNombreMascota(ad) }}</div>
+                <div class="meta" *ngIf="getCaracteristicasMascota(ad)">
+                  {{ getCaracteristicasMascota(ad) }}
+                </div>
+                <div class="meta">
+                  Dueño: <b>{{ getNombreDueno(ad) }}</b>
+                  <span *ngIf="ad.fechaPublicacion"> · {{ ad.fechaPublicacion }}</span>
+                </div>
+
+                <!-- Badge si ya solicitaste -->
+                <div class="badges" *ngIf="yaSolicite(ad)">
+                  <span class="badge requested">
+                    Ya solicitaste · {{ formatEstado(getSolicitudDe(ad)!.estado) }}
+                  </span>
+                </div>
+              </div>
             </div>
-          }
+
+            <div class="pill" [class.ok]="ad.disponible" [class.no]="!ad.disponible">
+              {{ ad.disponible ? 'Disponible' : 'No disponible' }}
+            </div>
+          </div>
+
+          <div class="card-actions">
+            <button class="btn primary"
+                    [disabled]="!ad.disponible || yaSolicite(ad) || (userId!=null && ad.usuarioPublicadorId===userId)"
+                    (click)="abrirModalSolicitud(ad)">
+              {{ yaSolicite(ad) ? 'Solicitada' : 'Solicitar' }}
+            </button>
+          </div>
         </div>
-      }
+
+        <div *ngIf="!cargando && adopciones.length===0" class="empty">
+          No hay publicaciones por ahora.
+        </div>
+      </ng-container>
+
+      <!-- Mis publicaciones -->
+      <ng-container *ngIf="vista==='misPublicaciones'">
+        <div *ngFor="let ad of misPublicaciones" class="card">
+          <div class="card-head">
+            <div class="pet-row">
+              <ng-container *ngIf="getFotoMascota(ad) as foto; else nofoto2">
+                <img class="pet-img" [src]="foto" alt="Foto mascota">
+              </ng-container>
+              <ng-template #nofoto2>
+                <div class="pet-ph">{{ getNombreMascota(ad).charAt(0) }}</div>
+              </ng-template>
+
+              <div class="pet-info">
+                <div class="title">{{ getNombreMascota(ad) }}</div>
+                <div class="meta" *ngIf="getCaracteristicasMascota(ad)">
+                  {{ getCaracteristicasMascota(ad) }}
+                </div>
+                <div class="meta">Mascota #{{ ad.mascotaId }}</div>
+                <div class="meta" *ngIf="ad.fechaPublicacion">Publicado: {{ ad.fechaPublicacion }}</div>
+              </div>
+            </div>
+
+            <div class="pill" [class.ok]="ad.disponible" [class.no]="!ad.disponible">
+              {{ ad.disponible ? 'Disponible' : 'No disponible' }}
+            </div>
+          </div>
+
+          <div class="card-actions">
+            <button class="btn" (click)="toggleDisponibilidad(ad)">
+              Cambiar disponibilidad
+            </button>
+            <button class="btn danger" (click)="eliminarPublicacion(ad)">
+              Eliminar
+            </button>
+          </div>
+        </div>
+
+        <div *ngIf="!cargando && misPublicaciones.length===0" class="empty">
+          No tienes publicaciones.
+        </div>
+      </ng-container>
+
+      <!-- Mis solicitudes -->
+      <ng-container *ngIf="vista==='misSolicitudes'">
+        <div *ngFor="let s of misSolicitudes" class="card">
+          <div class="card-head">
+            <div>
+              <div class="title">Solicitud #{{ s.id }}</div>
+              <div class="meta">Adopción #{{ s.adopcionId }}</div>
+              <div class="meta" *ngIf="s.fechaSolicitud">Fecha: {{ s.fechaSolicitud }}</div>
+              <div class="meta" *ngIf="s.mensaje">Mensaje: {{ s.mensaje }}</div>
+            </div>
+
+            <div class="pill ok">
+              {{ formatEstado(s.estado) }}
+            </div>
+          </div>
+
+          <div class="card-actions">
+            <button class="btn danger"
+                    (click)="cancelarSolicitud(s)"
+                    [disabled]="s.estado !== 'pendiente'">
+              Cancelar
+            </button>
+          </div>
+        </div>
+
+        <div *ngIf="!cargando && misSolicitudes.length===0" class="empty">
+          No has enviado solicitudes.
+        </div>
+      </ng-container>
+    </div>
+
+    <!-- INVENTARIO -->
+    <div class="right">
+      <div class="panel">
+        <div class="panel-title">Tu inventario</div>
+        <div class="panel-sub">Mascotas que puedes publicar</div>
+
+        <div *ngIf="inventario.length===0" class="empty">
+          No tienes mascotas registradas.
+        </div>
+
+        <div *ngFor="let m of inventario" class="inv-item">
+          <div class="inv-left">
+            <div class="inv-name">{{ m.nombre || ('Mascota #' + m.id) }}</div>
+            <div class="inv-meta">
+              <span *ngIf="m.tipo">{{ m.tipo }}</span>
+              <span *ngIf="m.raza"> · {{ m.raza }}</span>
+            </div>
+          </div>
+
+          <!-- Marcado si ya está en adopción -->
+          <div class="inv-right" *ngIf="mascotaEnAdopcion(m.id) as ad">
+            <span class="badge inventory">
+              En adopción · {{ ad.disponible ? 'Disponible' : 'No disponible' }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL SOLICITUD (pc- para no chocar con bootstrap) -->
+  <div class="pc-modal-backdrop" *ngIf="modalSolicitudOpen">
+    <div class="pc-modal">
+      <div class="pc-modal-head">
+        <div class="pc-modal-title">Solicitar adopción</div>
+        <button class="pc-modal-x" (click)="cerrarModalSolicitud()">✕</button>
+      </div>
+
+      <div class="pc-modal-body">
+        <div class="meta">
+          Vas a solicitar: <b>{{ getNombreMascota(selectedAdopcion!) }}</b>
+        </div>
+
+        <label class="label">Mensaje (opcional)</label>
+        <textarea class="textarea"
+                  [(ngModel)]="mensajeSolicitud"
+                  placeholder="Cuéntale al dueño por qué serías un buen adoptante..."></textarea>
+      </div>
+
+      <div class="pc-modal-actions">
+        <button class="btn" (click)="cerrarModalSolicitud()">Cancelar</button>
+        <button class="btn primary" (click)="enviarSolicitud()">Enviar solicitud</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PUBLICAR -->
+  <div class="pc-modal-backdrop" *ngIf="modalPublicarOpen">
+    <div class="pc-modal">
+      <div class="pc-modal-head">
+        <div class="pc-modal-title">Publicar adopción</div>
+        <button class="pc-modal-x" (click)="cerrarModalPublicar()">✕</button>
+      </div>
+
+      <div class="pc-modal-body">
+        <label class="label">Selecciona una mascota</label>
+
+        <select class="select" [(ngModel)]="selectedMascotaId">
+          <option [ngValue]="null">-- Selecciona --</option>
+          <option *ngFor="let m of inventario" [ngValue]="m.id">
+            {{ m.nombre || ('Mascota #' + m.id) }}
+          </option>
+        </select>
+
+        <div class="hint" *ngIf="selectedMascotaId && mascotaEnAdopcion(selectedMascotaId)">
+          Esa mascota ya está publicada en adopción.
+        </div>
+      </div>
+
+      <div class="pc-modal-actions">
+        <button class="btn" (click)="cerrarModalPublicar()">Cancelar</button>
+        <button class="btn primary" (click)="publicarDesdeInventario()">Publicar</button>
+      </div>
     </div>
   </div>
 </div>
-
-<app-modal [open]="showPublish()" title="Publicar adopción" (closed)="showPublish.set(false)">
-  <form class="d-grid gap-3" [formGroup]="publishForm" (ngSubmit)="publish()">
-    <div>
-      <label class="form-label">Mascota</label>
-      <select class="form-select pc-input" formControlName="mascotaId">
-        <option [ngValue]="null">Selecciona…</option>
-        @for (m of myPets(); track m.id) {
-          <option [ngValue]="m.id">{{ m.nombre }} ({{ m.especie || 'Mascota' }})</option>
-        }
-      </select>
-    </div>
-    <div class="form-check">
-      <input class="form-check-input" type="checkbox" id="disp" formControlName="disponible" />
-      <label class="form-check-label" for="disp">Disponible</label>
-    </div>
-    <div class="d-flex justify-content-end gap-2">
-      <button type="button" class="btn btn-outline-light pc-btn" (click)="showPublish.set(false)">Cancelar</button>
-      <button class="btn btn-primary pc-btn" type="submit">Publicar</button>
-    </div>
-  </form>
-</app-modal>
-
-<app-modal [open]="showRequest()" title="Solicitar adopción" (closed)="showRequest.set(false)">
-  <div class="pc-muted">Vas a solicitar: <span class="fw-semibold">{{ petName(requestTarget()?.mascotaId || 0) }}</span></div>
-  <div class="pc-divider my-3"></div>
-  <form class="d-grid gap-3" [formGroup]="requestForm" (ngSubmit)="sendRequest()">
-    <div>
-      <label class="form-label">Mensaje (opcional)</label>
-      <textarea class="form-control pc-input" rows="4" formControlName="mensaje" placeholder="Cuéntale al dueño por qué serías un buen adoptante..."></textarea>
-    </div>
-    <div class="d-flex justify-content-end gap-2">
-      <button type="button" class="btn btn-outline-light pc-btn" (click)="showRequest.set(false)">Cancelar</button>
-      <button class="btn btn-primary pc-btn" type="submit">Enviar solicitud</button>
-    </div>
-  </form>
-</app-modal>

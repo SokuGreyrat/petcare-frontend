@@ -4,7 +4,7 @@ import { Login } from './pages/login/login';
 import { Registro } from './pages/registro/registro';
 import { Dashboard } from './pages/dashboard/dashboard';
 import { MisMascotas } from './pages/mis-mascotas/mis-mascotas';
-import { Adopciones } from './pages/adopciones/adopciones';
+import { AdopcionesComponent } from './pages/adopciones/adopciones';
 import { Finanzas } from './pages/finanzas/finanzas';
 import { RedVecinal } from './pages/red-vecinal/red-vecinal';
 import { Perfil } from './pages/perfil/perfil';
@@ -22,7 +22,7 @@ export const routes: Routes = [
     children: [
       { path: 'dashboard', component: Dashboard },
       { path: 'mis-mascotas', component: MisMascotas },
-      { path: 'adopciones', component: Adopciones },
+      { path: 'adopciones', component: AdopcionesComponent },
       { path: 'finanzas', component: Finanzas },
       { path: 'red-vecinal', component: RedVecinal },
       { path: 'perfil', component: Perfil },
