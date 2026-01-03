@@ -1,165 +1,169 @@
-<div class="d-flex align-items-center justify-content-between gap-2">
-  <div>
-    <div class="h3 m-0 pc-title">Finanzas</div>
-    <div class="pc-muted">Presupuesto mensual y gastos por mascota.</div>
-  </div>
-  <div class="d-flex gap-2">
-    <button class="btn btn-outline-light pc-btn" (click)="reload()"><i class="bi bi-arrow-clockwise"></i></button>
-    <button class="btn btn-outline-light pc-btn" (click)="openBudget()"><i class="bi bi-wallet2 me-1"></i>Presupuesto</button>
-    <button class="btn btn-primary pc-btn" (click)="openGasto()"><i class="bi bi-plus-lg me-1"></i>Registrar gasto</button>
-  </div>
+<!-- Toast -->
+<div class="toast-top" *ngIf="toastVisible" [class.err]="toastType==='err'">
+  {{ toastMsg }}
 </div>
 
-<div class="row g-3 mt-1">
-  <div class="col-12 col-xl-4">
-    <div class="pc-card pc-shadow p-3">
-      <div class="d-flex align-items-center justify-content-between">
-        <div>
-          <div class="h5 m-0 pc-title">Mes</div>
-          <div class="pc-muted small">Selecciona para ver resumen</div>
+<div class="finanzas-page">
+  <div class="topbar">
+    <div>
+      <h1>Finanzas</h1>
+      <p class="sub">Presupuesto mensual y gastos por mascota.</p>
+
+      <div class="filters">
+        <div class="filter">
+          <label>Mascota</label>
+          <select [(ngModel)]="mascotaSeleccionadaId" (change)="onContextChange()">
+            <option [ngValue]="null" *ngIf="loadingMascotas">Cargando mascotas...</option>
+
+            <option [ngValue]="null" *ngIf="!loadingMascotas && mascotas.length === 0">
+              No tienes mascotas registradas
+            </option>
+
+            <option [ngValue]="null" *ngIf="!loadingMascotas && mascotas.length > 0">
+              Selecciona una mascota
+            </option>
+
+            <option *ngFor="let m of mascotas" [ngValue]="m.idMascota">
+              {{ m.nombre }}
+            </option>
+          </select>
         </div>
-        <input class="form-control pc-input" style="width: 140px" type="month" [value]="month()" (change)="month.set(($any($event.target).value))" />
+
+        <div class="filter">
+          <label>Mes</label>
+          <select [(ngModel)]="mesSeleccionado" (change)="onContextChange()">
+            <option *ngFor="let m of meses" [ngValue]="m.num">{{ m.nombre }}</option>
+          </select>
+        </div>
+
+        <div class="filter">
+          <label>Año</label>
+          <select [(ngModel)]="anioSeleccionado" (change)="onContextChange()">
+            <option *ngFor="let a of anios" [ngValue]="a">{{ a }}</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn secondary" (click)="abrirModalPresupuesto()">Presupuesto</button>
+      <button class="btn primary" (click)="abrirModalGasto()">+ Registrar gasto</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="cards">
+      <div class="card">
+        <div class="title">Presupuesto</div>
+        <div class="value">
+          <span *ngIf="presupuestoMonto !== null; else dash1">
+            {{ presupuestoMonto | currency:'MXN' }}
+          </span>
+          <ng-template #dash1>—</ng-template>
+        </div>
       </div>
 
-      <div class="pc-divider my-3"></div>
-
-      <div class="d-grid gap-2">
-        <div class="pc-surface p-3">
-          <div class="pc-muted small">Presupuesto</div>
-          <div class="h4 m-0">@if (budgetMes()) { ${{ budgetMes()?.monto }} } @else { — }</div>
-        </div>
-        <div class="pc-surface p-3">
-          <div class="pc-muted small">Gasto del mes</div>
-          <div class="h4 m-0">${{ totalMes() }}</div>
-        </div>
-        <div class="pc-surface p-3" [class.negative]="restante() < 0">
-          <div class="pc-muted small">Restante</div>
-          <div class="h4 m-0">${{ restante() }}</div>
-        </div>
+      <div class="card">
+        <div class="title">Gasto del mes</div>
+        <div class="value">{{ totalGastos | currency:'MXN' }}</div>
       </div>
 
-      <div class="pc-divider my-3"></div>
+      <div class="card">
+        <div class="title">Restante</div>
+        <div class="value">{{ restante | currency:'MXN' }}</div>
+      </div>
+    </div>
 
-      <div class="pc-muted small">Por categoría</div>
-      <div class="d-grid gap-2 mt-2">
-        @for (c of byCategoria(); track c.categoria) {
-          <div>
-            <div class="d-flex justify-content-between small">
-              <span>{{ c.categoria }}</span>
-              <span class="fw-semibold">${{ c.monto }}</span>
-            </div>
-            <div class="progress" style="height: 7px; background: rgba(255,255,255,0.08)">
-              <div
-                class="progress-bar"
-                role="progressbar"
-                [style.width]="(totalMes() ? (c.monto / totalMes()) * 100 : 0) + '%'"
-              ></div>
-            </div>
+    <div class="gastos">
+      <h3>Gastos del mes</h3>
+
+      <div class="empty" *ngIf="gastos.length === 0">
+        No hay gastos registrados en este mes.
+      </div>
+
+      <div class="list" *ngIf="gastos.length > 0">
+        <div class="gasto-item" *ngFor="let g of gastos">
+          <div class="left">
+            <div class="cat">{{ g.categoria }}</div>
+            <div class="desc" *ngIf="g.descripcion">{{ g.descripcion }}</div>
           </div>
-        }
+          <div class="right">
+            <div class="amt">{{ g.monto | currency:'MXN' }}</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="col-12 col-xl-8">
-    <div class="pc-card pc-shadow p-3">
-      <div class="d-flex align-items-center justify-content-between">
-        <div>
-          <div class="h5 m-0 pc-title">Gastos del mes</div>
-          <div class="pc-muted small">{{ gastosMes().length }} registros</div>
-        </div>
+  <!-- ========================= -->
+  <!-- MODAL PRESUPUESTO -->
+  <!-- ========================= -->
+  <div class="pc-modal-backdrop" *ngIf="modalPresupuesto" (click)="cerrarModales()"></div>
+
+  <div class="pc-modal" *ngIf="modalPresupuesto">
+    <div class="pc-modal-header">
+      <h2>Configurar presupuesto</h2>
+      <button class="pc-x" (click)="cerrarModales()">✕</button>
+    </div>
+
+    <div class="pc-modal-body">
+      <div class="field">
+        <label>Monto</label>
+        <input type="number" [(ngModel)]="formPresupuesto.monto" placeholder="Ej. 1500" />
       </div>
 
-      <div class="pc-divider my-3"></div>
+      <div class="hint">
+        Se guardará para <b>{{ nombreMes(mesSeleccionado) }} {{ anioSeleccionado }}</b>.
+      </div>
+    </div>
 
-      @if (gastosMes().length === 0) {
-        <div class="pc-muted">No hay gastos registrados en este mes.</div>
-      } @else {
-        <div class="table-responsive">
-          <table class="table table-dark table-hover align-middle">
-            <thead>
-              <tr>
-                <th>Categoría</th>
-                <th>Monto</th>
-                <th>Mascota</th>
-                <th>Fecha</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (g of gastosMes(); track g.id) {
-                <tr>
-                  <td>{{ g.categoria }}</td>
-                  <td class="fw-semibold">${{ g.monto }}</td>
-                  <td>{{ mascotaLabel(g.mascotaId) }}</td>
-                  <td class="small pc-muted">{{ format(g.fecha) }}</td>
-                  <td class="text-end">
-                    <button class="btn btn-sm btn-outline-danger pc-btn" (click)="deleteGasto(g)"><i class="bi bi-trash"></i></button>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      }
+    <div class="pc-modal-actions">
+      <button class="btn secondary" (click)="cerrarModales()">Cancelar</button>
+      <button class="btn primary" [disabled]="loading" (click)="guardarPresupuesto()">Guardar</button>
+    </div>
+  </div>
+
+  <!-- ========================= -->
+  <!-- MODAL GASTO -->
+  <!-- ========================= -->
+  <div class="pc-modal-backdrop" *ngIf="modalGasto" (click)="cerrarModales()"></div>
+
+  <div class="pc-modal" *ngIf="modalGasto">
+    <div class="pc-modal-header">
+      <h2>Registrar gasto</h2>
+      <button class="pc-x" (click)="cerrarModales()">✕</button>
+    </div>
+
+    <div class="pc-modal-body">
+      <div class="field">
+        <label>Categoría</label>
+        <select [(ngModel)]="formGasto.categoria">
+          <option value="Alimento">Alimento</option>
+          <option value="Veterinario">Veterinario</option>
+          <option value="Higiene">Higiene</option>
+          <option value="Juguetes">Juguetes</option>
+          <option value="Otros">Otros</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Monto</label>
+        <input type="number" [(ngModel)]="formGasto.monto" placeholder="Ej. 250" />
+      </div>
+
+      <div class="field">
+        <label>Descripción (opcional)</label>
+        <input type="text" [(ngModel)]="formGasto.descripcion" placeholder="Ej. Croquetas 3kg" />
+      </div>
+
+      <div class="hint">
+        Se registrará en <b>{{ nombreMes(mesSeleccionado) }} {{ anioSeleccionado }}</b>.
+      </div>
+    </div>
+
+    <div class="pc-modal-actions">
+      <button class="btn secondary" (click)="cerrarModales()">Cancelar</button>
+      <button class="btn primary" [disabled]="loading" (click)="guardarGasto()">Guardar</button>
     </div>
   </div>
 </div>
-
-<app-modal [open]="showGasto()" title="Registrar gasto" (closed)="showGasto.set(false)">
-  <form class="row g-2" [formGroup]="gastoForm" (ngSubmit)="createGasto()">
-    <div class="col-12 col-md-6">
-      <label class="form-label">Categoría</label>
-      <input class="form-control pc-input" formControlName="categoria" placeholder="Veterinario / Alimento / Accesorios" />
-    </div>
-    <div class="col-12 col-md-6">
-      <label class="form-label">Monto</label>
-      <input class="form-control pc-input" type="number" formControlName="monto" />
-    </div>
-
-    <div class="col-12 col-md-6">
-      <label class="form-label">Mascota (opcional)</label>
-      <select class="form-select pc-input" formControlName="mascotaId">
-        <option [ngValue]="null">—</option>
-        @for (m of myMascotas(); track m.id) {
-          <option [ngValue]="m.id">{{ m.nombre }}</option>
-        }
-      </select>
-    </div>
-    <div class="col-12 col-md-6">
-      <label class="form-label">Proveedor (opcional)</label>
-      <input class="form-control pc-input" formControlName="proveedor" placeholder="Clínica / Tienda" />
-    </div>
-
-    <div class="col-12 col-md-6">
-      <label class="form-label">Fecha</label>
-      <input class="form-control pc-input" type="date" formControlName="fecha" />
-    </div>
-    <div class="col-12 col-md-6">
-      <label class="form-label">Recordatorio (opcional)</label>
-      <input class="form-control pc-input" type="date" formControlName="fechaRecordatorio" />
-    </div>
-
-    <div class="col-12 d-flex justify-content-end gap-2">
-      <button type="button" class="btn btn-outline-light pc-btn" (click)="showGasto.set(false)">Cancelar</button>
-      <button class="btn btn-primary pc-btn" type="submit">Guardar</button>
-    </div>
-  </form>
-</app-modal>
-
-<app-modal [open]="showBudget()" title="Presupuesto mensual" (closed)="showBudget.set(false)">
-  <form class="row g-2" [formGroup]="budgetForm" (ngSubmit)="saveBudget()">
-    <div class="col-12 col-md-6">
-      <label class="form-label">Mes</label>
-      <input class="form-control pc-input" type="month" formControlName="mes" />
-    </div>
-    <div class="col-12 col-md-6">
-      <label class="form-label">Monto</label>
-      <input class="form-control pc-input" type="number" formControlName="monto" />
-    </div>
-    <div class="col-12 d-flex justify-content-end gap-2">
-      <button type="button" class="btn btn-outline-light pc-btn" (click)="showBudget.set(false)">Cancelar</button>
-      <button class="btn btn-primary pc-btn" type="submit">Guardar</button>
-    </div>
-  </form>
-</app-modal>

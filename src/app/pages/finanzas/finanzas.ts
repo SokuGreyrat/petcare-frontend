@@ -1,194 +1,421 @@
-import { Component, computed, inject, signal } from '@angular/core';
-import { NgFor, NgIf } from '@angular/common';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ApiService } from '../../services/api.service';
-import { AuthService } from '../../services/auth.service';
-import { ToastService } from '../../services/toast.service';
-import { Gasto, Mascota, Presupuesto } from '../../models/api.models';
-import { Modal } from '../../components/modal/modal';
-import { formatFriendlyDate, toLocalDateString, toMonthString } from '../../utils/date';
+import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
+import { catchError, of } from 'rxjs';
+
+type MascotaUI = {
+  idMascota: number;
+  nombre: string;
+  usuarioId: number;
+};
+
+type Presupuesto = {
+  id: number;
+  usuarioId: number;
+  mes: string;
+  monto: number;
+};
+
+type Gasto = {
+  id: number;
+  usuarioId: number;
+  mascotaId?: number;
+  categoria: string;
+  monto: number;
+  fecha: any;
+  proveedor?: string;
+};
+
+type GastoUI = {
+  idGasto: number;
+  categoria: string;
+  monto: number;
+  descripcion?: string;
+};
 
 @Component({
   selector: 'app-finanzas',
   standalone: true,
-  imports: [NgFor, NgIf, ReactiveFormsModule, Modal],
+  imports: [CommonModule, FormsModule],
   templateUrl: './finanzas.html',
-  styleUrl: './finanzas.css',
+  styleUrls: ['./finanzas.css'],
 })
-export class Finanzas {
-  private api = inject(ApiService);
-  private auth = inject(AuthService);
-  private toast = inject(ToastService);
+export class Finanzas implements OnInit {
+  private http = inject(HttpClient);
 
-  month = signal(toMonthString());
-  showGasto = signal(false);
-  showBudget = signal(false);
+  // UI
+  toastVisible = false;
+  toastMsg = '';
+  toastType: 'ok' | 'err' = 'ok';
 
-  gastos = signal<Gasto[]>([]);
-  presupuestos = signal<Presupuesto[]>([]);
-  mascotas = signal<Mascota[]>([]);
+  loading = false;
+  loadingMascotas = false;
 
-  me = computed(() => this.auth.requireUser());
-  myMascotas = computed(() => this.mascotas().filter((m) => m.usuarioId === this.me().id));
-  myGastos = computed(() => this.gastos().filter((g) => g.usuarioId === this.me().id));
+  // Modales
+  modalPresupuesto = false;
+  modalGasto = false;
 
-  gastosMes = computed(() => {
-    const m = this.month();
-    return this.myGastos().filter((g) => {
-      const f = (g.fecha || g.fechaCreacion || '').toString();
-      return f.startsWith(m);
-    });
-  });
+  // Contexto
+  meses = [
+    { num: 1, nombre: 'Enero' },
+    { num: 2, nombre: 'Febrero' },
+    { num: 3, nombre: 'Marzo' },
+    { num: 4, nombre: 'Abril' },
+    { num: 5, nombre: 'Mayo' },
+    { num: 6, nombre: 'Junio' },
+    { num: 7, nombre: 'Julio' },
+    { num: 8, nombre: 'Agosto' },
+    { num: 9, nombre: 'Septiembre' },
+    { num: 10, nombre: 'Octubre' },
+    { num: 11, nombre: 'Noviembre' },
+    { num: 12, nombre: 'Diciembre' },
+  ];
 
-  totalMes = computed(() => this.gastosMes().reduce((acc, g) => acc + (Number(g.monto) || 0), 0));
+  anios: number[] = [];
+  mesSeleccionado = new Date().getMonth() + 1;
+  anioSeleccionado = new Date().getFullYear();
 
-  budgetMes = computed(() => {
-    const m = this.month();
-    return this.presupuestos().find((p) => p.usuarioId === this.me().id && p.mes === m) || null;
-  });
+  // Mascotas
+  mascotas: MascotaUI[] = [];
+  mascotaSeleccionadaId: number | null = null;
 
-  restante = computed(() => {
-    const b = Number(this.budgetMes()?.monto) || 0;
-    return b - this.totalMes();
-  });
+  // Datos
+  presupuestoMonto: number | null = null;
+  private presupuestoId: number | null = null;
 
-  byCategoria = computed(() => {
-    const map: Record<string, number> = {};
-    for (const g of this.gastosMes()) {
-      const k = (g.categoria || 'Sin categoría').trim();
-      map[k] = (map[k] || 0) + (Number(g.monto) || 0);
+  gastos: GastoUI[] = [];
+  totalGastos = 0;
+  restante = 0;
+
+  // Forms
+  formPresupuesto: { monto: number | null } = { monto: null };
+  formGasto: { monto: number | null; categoria: string; descripcion: string } = {
+    monto: null,
+    categoria: 'Alimento',
+    descripcion: '',
+  };
+
+  ngOnInit(): void {
+    const a = new Date().getFullYear();
+    this.anios = [a - 1, a, a + 1];
+
+    this.cargarMascotasDelUsuario();
+  }
+
+  // -----------------------
+  // Helpers
+  // -----------------------
+  private showToast(msg: string, type: 'ok' | 'err' = 'ok') {
+    this.toastMsg = msg;
+    this.toastType = type;
+    this.toastVisible = true;
+    setTimeout(() => (this.toastVisible = false), 2500);
+  }
+
+  private errorMsg(err: any): string {
+    const e = err as HttpErrorResponse;
+    if (e?.error) {
+      if (typeof e.error === 'string') return e.error;
+      if (e.error?.message) return e.error.message;
+      if (e.error?.error) return e.error.error;
     }
-    return Object.entries(map)
-      .sort((a, b) => b[1] - a[1])
-      .map(([categoria, monto]) => ({ categoria, monto }));
-  });
-
-  gastoForm = new FormGroup({
-    categoria: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-    monto: new FormControl<number | null>(null, { validators: [Validators.required] }),
-    proveedor: new FormControl('', { nonNullable: true }),
-    mascotaId: new FormControl<number | null>(null),
-    fecha: new FormControl(toLocalDateString(), { nonNullable: true }),
-    fechaRecordatorio: new FormControl('', { nonNullable: true }),
-  });
-
-  budgetForm = new FormGroup({
-    mes: new FormControl(this.month(), { nonNullable: true, validators: [Validators.required] }),
-    monto: new FormControl<number | null>(null, { validators: [Validators.required] }),
-  });
-
-  constructor() {
-    this.reload();
+    return 'Ocurrió un error. Revisa backend.';
   }
 
-  reload(): void {
-    this.api.getGastos().subscribe({ next: (v) => this.gastos.set(v || []) });
-    this.api.getPresupuestos().subscribe({ next: (v) => this.presupuestos.set(v || []) });
-    this.api.getMascotas().subscribe({ next: (v) => this.mascotas.set(v || []) });
+  private authHeaders(): HttpHeaders {
+    let headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+
+    const token =
+      localStorage.getItem('token') ||
+      localStorage.getItem('access_token') ||
+      localStorage.getItem('jwt');
+
+    if (token) {
+      headers = headers.set(
+        'Authorization',
+        token.startsWith('Bearer ') ? token : `Bearer ${token}`
+      );
+    }
+    return headers;
   }
 
-  mascotaLabel(id?: number | null): string {
-    if (!id) return '—';
-    const m = this.myMascotas().find((x) => x.id === id);
-    return m?.nombre || ('#' + id);
+  private getUserIdOrNull(): number | null {
+    const directKeys = ['idUsuario', 'userId', 'id_user', 'usuarioId'];
+    for (const k of directKeys) {
+      const v = localStorage.getItem(k);
+      if (v && !isNaN(Number(v))) return Number(v);
+    }
+
+    const objKeys = ['user', 'usuario', 'currentUser', 'authUser'];
+    for (const k of objKeys) {
+      const raw = localStorage.getItem(k);
+      if (!raw) continue;
+      try {
+        const o = JSON.parse(raw);
+        const id = o?.idUsuario ?? o?.userId ?? o?.id ?? o?.id_user;
+        if (id && !isNaN(Number(id))) return Number(id);
+      } catch {}
+    }
+    return null;
   }
 
-
-  format(d?: string): string {
-    return formatFriendlyDate(d);
+  nombreMes(mes: number): string {
+    return this.meses.find((m) => m.num === Number(mes))?.nombre ?? 'Enero';
   }
 
-  openGasto(): void {
-    this.gastoForm.reset({
-      categoria: '',
-      monto: null,
-      proveedor: '',
-      mascotaId: null,
-      fecha: toLocalDateString(),
-      fechaRecordatorio: '',
-    });
-    this.showGasto.set(true);
+  private toDate(x: any): Date | null {
+    if (!x) return null;
+    const d = new Date(x);
+    return isNaN(d.getTime()) ? null : d;
   }
 
-  createGasto(): void {
-    if (this.gastoForm.invalid) {
-      this.gastoForm.markAllAsTouched();
+  private recalcular() {
+    this.totalGastos = this.gastos.reduce((acc, g) => acc + (Number(g.monto) || 0), 0);
+    const presupuesto = Number(this.presupuestoMonto) || 0;
+    this.restante = presupuesto - this.totalGastos;
+  }
+
+  // -----------------------
+  // ✅ Mascotas: SIN tocar backend
+  // -----------------------
+  private cargarMascotasDelUsuario() {
+    const usuarioId = this.getUserIdOrNull();
+    if (!usuarioId) {
+      this.showToast('No encontré idUsuario en localStorage. Inicia sesión otra vez.', 'err');
+      this.mascotas = [];
       return;
     }
-    const raw = this.gastoForm.getRawValue();
-    const body: Gasto = {
-      usuarioId: this.me().id!,
-      categoria: raw.categoria!,
-      monto: Number(raw.monto),
-      proveedor: raw.proveedor || undefined,
-      mascotaId: raw.mascotaId || undefined,
-      fecha: raw.fecha || toLocalDateString(),
-      fechaRecordatorio: raw.fechaRecordatorio || undefined,
-    };
-    this.api.createGasto(body).subscribe({
-      next: (created) => {
-        this.gastos.update((arr) => [...arr, created]);
-        this.toast.show('Gasto registrado.', 'success');
-        this.showGasto.set(false);
-      },
-      error: () => this.toast.show('No se pudo registrar el gasto.', 'danger'),
-    });
+
+    this.loadingMascotas = true;
+
+    this.http
+      .get<any[]>('/api/petcare/allmascotas', { headers: this.authHeaders() })
+      .pipe(catchError(() => of([] as any[])))
+      .subscribe((resp) => {
+        const lista = Array.isArray(resp) ? resp : [];
+
+        const normalizadas: MascotaUI[] = lista
+          .map((x: any) => ({
+            idMascota: Number(x?.id ?? x?.idMascota ?? x?.id_mascota),
+            nombre: String(x?.nombre ?? 'Mascota'),
+            usuarioId: Number(x?.usuarioId ?? x?.idUsuario ?? x?.userId ?? x?.user_id),
+          }))
+          .filter((m: MascotaUI) => !!m.idMascota && !isNaN(m.idMascota));
+
+        this.mascotas = normalizadas.filter((m) => Number(m.usuarioId) === Number(usuarioId));
+
+        if (!this.mascotaSeleccionadaId && this.mascotas.length > 0) {
+          this.mascotaSeleccionadaId = this.mascotas[0].idMascota;
+        }
+
+        this.loadingMascotas = false;
+
+        if (this.mascotas.length === 0) {
+          this.showToast(
+            'No me salió ninguna mascota para este usuario. Revisa que usuarioId esté bien en la BD.',
+            'err'
+          );
+          return;
+        }
+
+        this.onContextChange();
+      });
   }
 
-  deleteGasto(g: Gasto): void {
-    if (!g.id) return;
-    if (!confirm('¿Eliminar este gasto?')) return;
-    this.api.deleteGasto(g.id).subscribe({
-      next: () => {
-        this.gastos.update((arr) => arr.filter((x) => x.id !== g.id));
-        this.toast.show('Gasto eliminado.', 'info');
-      },
-      error: () => this.toast.show('No se pudo eliminar.', 'danger'),
-    });
+  // -----------------------
+  // Presupuesto + gastos
+  // -----------------------
+  onContextChange() {
+    const usuarioId = this.getUserIdOrNull();
+    if (!usuarioId) return;
+
+    const mesNombre = this.nombreMes(this.mesSeleccionado);
+    const anio = Number(this.anioSeleccionado);
+    const mesNum = Number(this.mesSeleccionado);
+    const mascotaId = this.mascotaSeleccionadaId ? Number(this.mascotaSeleccionadaId) : null;
+
+    // presupuesto por usuario + mes (sin año en backend)
+    this.http
+      .get<Presupuesto[]>('/api/petcare/allpresupuestos', { headers: this.authHeaders() })
+      .pipe(catchError(() => of([] as Presupuesto[])))
+      .subscribe((pres) => {
+        const p = (pres ?? []).find(
+          (x) => Number(x.usuarioId) === Number(usuarioId) && String(x.mes) === mesNombre
+        );
+
+        this.presupuestoMonto = p?.monto ?? null;
+        this.presupuestoId = p?.id ?? null;
+
+        // gastos por usuario + mes/año (por fecha) + mascotaId
+        this.http
+          .get<Gasto[]>('/api/petcare/allgastos', { headers: this.authHeaders() })
+          .pipe(catchError(() => of([] as Gasto[])))
+          .subscribe((gas) => {
+            const filtrados = (gas ?? []).filter((g) => {
+              if (Number(g.usuarioId) !== Number(usuarioId)) return false;
+              if (mascotaId && Number(g.mascotaId) !== mascotaId) return false;
+
+              const d = this.toDate(g.fecha);
+              if (!d) return false;
+
+              return d.getMonth() + 1 === mesNum && d.getFullYear() === anio;
+            });
+
+            filtrados.sort((a, b) => {
+              const da = this.toDate(a.fecha)?.getTime() ?? 0;
+              const db = this.toDate(b.fecha)?.getTime() ?? 0;
+              return db - da;
+            });
+
+            this.gastos = filtrados.map((g) => ({
+              idGasto: Number(g.id),
+              categoria: String(g.categoria),
+              monto: Number(g.monto),
+              descripcion: g.proveedor ? String(g.proveedor) : '',
+            }));
+
+            this.recalcular();
+          });
+      });
   }
 
-  openBudget(): void {
-    const current = this.budgetMes();
-    this.budgetForm.reset({
-      mes: this.month(),
-      monto: (current?.monto as any) || null,
-    });
-    this.showBudget.set(true);
-  }
-
-  saveBudget(): void {
-    if (this.budgetForm.invalid) {
-      this.budgetForm.markAllAsTouched();
+  // -----------------------
+  // ✅ MODALES (lo que te faltaba)
+  // -----------------------
+  abrirModalPresupuesto() {
+    if (!this.mascotaSeleccionadaId) {
+      this.showToast('Selecciona una mascota primero.', 'err');
       return;
     }
-    const mes = this.budgetForm.value.mes!;
-    const monto = Number(this.budgetForm.value.monto);
-    const current = this.presupuestos().find((p) => p.usuarioId === this.me().id && p.mes === mes);
-    const body: Presupuesto = {
-      usuarioId: this.me().id!,
-      mes,
+    this.formPresupuesto = { monto: this.presupuestoMonto };
+    this.modalPresupuesto = true;
+    this.modalGasto = false;
+  }
+
+  abrirModalGasto() {
+    if (!this.mascotaSeleccionadaId) {
+      this.showToast('Selecciona una mascota primero.', 'err');
+      return;
+    }
+    this.formGasto = { monto: null, categoria: 'Alimento', descripcion: '' };
+    this.modalGasto = true;
+    this.modalPresupuesto = false;
+  }
+
+  cerrarModales() {
+    this.modalPresupuesto = false;
+    this.modalGasto = false;
+  }
+
+  // -----------------------
+  // Guardar presupuesto
+  // -----------------------
+  guardarPresupuesto() {
+    const usuarioId = this.getUserIdOrNull();
+    if (!usuarioId) return;
+
+    const monto = Number(this.formPresupuesto.monto);
+    if (!monto || monto <= 0) {
+      this.showToast('Pon un monto válido.', 'err');
+      return;
+    }
+
+    const payload = {
+      usuarioId,
+      mes: this.nombreMes(Number(this.mesSeleccionado)),
       monto,
     };
 
-    if (current?.id) {
-      this.api.updatePresupuesto(current.id, body).subscribe({
-        next: (updated) => {
-          this.presupuestos.update((arr) => arr.map((x) => (x.id === updated.id ? updated : x)));
-          this.toast.show('Presupuesto actualizado.', 'success');
-          this.showBudget.set(false);
-        },
-        error: () => this.toast.show('No se pudo actualizar.', 'danger'),
-      });
+    this.loading = true;
+
+    if (this.presupuestoId) {
+      this.http
+        .put(`/api/petcare/update-presupuesto/${this.presupuestoId}`, payload, {
+          headers: this.authHeaders(),
+        })
+        .subscribe({
+          next: () => {
+            this.loading = false;
+            this.cerrarModales();
+            this.showToast('Presupuesto actualizado ✅', 'ok');
+            this.onContextChange();
+          },
+          error: (err) => {
+            this.loading = false;
+            this.showToast(this.errorMsg(err), 'err');
+          },
+        });
       return;
     }
 
-    this.api.createPresupuesto(body).subscribe({
-      next: (created) => {
-        this.presupuestos.update((arr) => [...arr, created]);
-        this.toast.show('Presupuesto guardado.', 'success');
-        this.showBudget.set(false);
-      },
-      error: () => this.toast.show('No se pudo guardar.', 'danger'),
-    });
+    this.http
+      .post('/api/petcare/create-presupuesto', payload, { headers: this.authHeaders() })
+      .subscribe({
+        next: () => {
+          this.loading = false;
+          this.cerrarModales();
+          this.showToast('Presupuesto guardado ✅', 'ok');
+          this.onContextChange();
+        },
+        error: (err) => {
+          this.loading = false;
+          this.showToast(this.errorMsg(err), 'err');
+        },
+      });
+  }
+
+  // -----------------------
+  // Guardar gasto
+  // -----------------------
+  guardarGasto() {
+    const usuarioId = this.getUserIdOrNull();
+    if (!usuarioId) return;
+
+    if (!this.mascotaSeleccionadaId) {
+      this.showToast('Selecciona una mascota.', 'err');
+      return;
+    }
+
+    const monto = Number(this.formGasto.monto);
+    if (!monto || monto <= 0) {
+      this.showToast('Pon un monto válido.', 'err');
+      return;
+    }
+
+    const mes = Number(this.mesSeleccionado);
+    const anio = Number(this.anioSeleccionado);
+
+    // fecha dentro del mes seleccionado para que aparezca en el filtro
+    const fecha = new Date(anio, mes - 1, 1, 12, 0, 0);
+
+    const payload = {
+      usuarioId,
+      mascotaId: Number(this.mascotaSeleccionadaId),
+      categoria: this.formGasto.categoria,
+      monto,
+      fecha,
+      proveedor: (this.formGasto.descripcion || '').trim() || null,
+    };
+
+    this.loading = true;
+
+    this.http
+      .post('/api/petcare/create-gasto', payload, { headers: this.authHeaders() })
+      .subscribe({
+        next: () => {
+          this.loading = false;
+          this.cerrarModales();
+          this.showToast('Gasto guardado ✅', 'ok');
+          this.onContextChange();
+        },
+        error: (err) => {
+          this.loading = false;
+          this.showToast(this.errorMsg(err), 'err');
+        },
+      });
   }
 }
+
+// ✅ Alias para evitar errores de routes si importan FinanzasComponent
+export { Finanzas as FinanzasComponent };
