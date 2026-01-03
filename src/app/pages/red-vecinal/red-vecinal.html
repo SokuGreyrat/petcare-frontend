@@ -1,164 +1,221 @@
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-  <div>
-    <div class="h3 m-0 pc-title">Red Vecinal</div>
-    <div class="pc-muted">Comunidad por colonia: alertas, fotos y apoyo entre vecinos.</div>
-  </div>
-  <div class="d-flex flex-wrap gap-2">
-    <button class="btn btn-outline-light pc-btn" (click)="reload()"><i class="bi bi-arrow-clockwise"></i></button>
-    <button class="btn btn-outline-light pc-btn" (click)="openJoin()"><i class="bi bi-door-open me-1"></i>Unirme</button>
-    <button class="btn btn-primary pc-btn" (click)="openCreateColonia()"><i class="bi bi-plus-lg me-1"></i>Crear colonia</button>
-  </div>
+<!-- Toast -->
+<div class="toast-top" *ngIf="toastVisible">
+  {{ toastMsg }}
 </div>
 
-<div class="row g-3 mt-1">
-  <div class="col-12 col-xl-4">
-    <div class="pc-card pc-shadow p-3">
-      <div class="d-flex align-items-center justify-content-between">
+<div class="rv-page">
+  <div class="rv-header">
+    <div class="rv-title">
+      <h1>Red Vecinal</h1>
+      <p>Comunidad por colonia: alertas, posts y apoyo entre vecinos.</p>
+    </div>
+
+    <!-- ✅ Solo botones arriba -->
+    <div class="rv-actions">
+      <button class="btn ghost" (click)="abrirUnirme()">Unirme</button>
+      <button class="btn primary" (click)="abrirCrearColonia()">Crear colonia</button>
+    </div>
+  </div>
+
+  <div class="rv-content" *ngIf="!loading; else loadingTpl">
+    <div class="card">
+      <div class="card-head">
         <div>
-          <div class="h5 m-0 pc-title">Mi colonia</div>
-          <div class="pc-muted small">Selecciona una colonia</div>
+          <h3>Mi colonia</h3>
+          <p class="muted" *ngIf="misColonias.length===0">
+            Aún no estás en ninguna colonia. Usa los botones de arriba para unirte o crear una.
+          </p>
         </div>
-        <select class="form-select pc-input" style="width: 210px" [value]="(selectedColoniaId() ?? '').toString()" (change)="selectedColoniaId.set($any($event.target).value ? +$any($event.target).value : null)">
-          <option value="">—</option>
-          @for (c of myColonias(); track c.id) {
-            <option [value]="c.id">{{ c.nombre }}</option>
-          }
-        </select>
+
+        <div class="right" *ngIf="misColonias.length>0">
+          <select class="select" [ngModel]="coloniaActivaId" (ngModelChange)="setColoniaActiva($event)">
+            <option *ngFor="let c of misColonias" [ngValue]="c.id">
+              {{ c.nombre }}
+            </option>
+          </select>
+        </div>
       </div>
-      <div class="pc-divider my-3"></div>
 
-      @if (!selectedColonia()) {
-        <div class="pc-muted">Crea o únete a una colonia para ver el feed.</div>
-      } @else {
-        <div class="pc-surface p-3">
-          <div class="fw-semibold">{{ selectedColonia()?.nombre }}</div>
-          <div class="small pc-muted">Código: <span class="fw-semibold">{{ selectedColonia()?.codigoInvitacion }}</span></div>
-          <div class="small pc-muted">Compártelo para invitar vecinos.</div>
+      <div class="card-body" *ngIf="coloniaActiva; else noColoniaTpl">
+        <div class="colonia-info">
+          <div>
+            <div class="label">Colonia</div>
+            <div class="value">{{ coloniaActiva.nombre }}</div>
+          </div>
+
+          <div>
+            <div class="label">Código</div>
+            <div class="value mono">{{ coloniaActiva.codigoInvitacion }}</div>
+          </div>
+
+          <div>
+            <div class="label">Dueño</div>
+            <div class="value">{{ coloniaActiva.userId === userId ? 'Tú' : ('Usuario #' + coloniaActiva.userId) }}</div>
+          </div>
+
+          <div class="right">
+            <button class="btn primary" (click)="abrirNuevoPost()">Publicar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ✅ Ya NO hay botones aquí abajo -->
+      <ng-template #noColoniaTpl>
+        <div class="empty">
+          <div class="emoji">🏘️</div>
+          <div class="txt">
+            <div class="t">Únete o crea una colonia</div>
+            <div class="s">Usa los botones de arriba. Con un código puedes entrar a la colonia de un vecino.</div>
+          </div>
+        </div>
+      </ng-template>
+    </div>
+
+    <div class="feed" *ngIf="coloniaActiva">
+      <div class="feed-head">
+        <h3>Publicaciones</h3>
+        <span class="pill" *ngIf="posts.length">{{ posts.length }} posts</span>
+      </div>
+
+      <div class="post card" *ngFor="let p of posts">
+        <div class="post-top">
+          <div class="who">
+            <div class="name">{{ p.autorNombre }}</div>
+            <div class="meta">
+              <span class="date">{{ p.fechaCreacion }}</span>
+              <span class="tag alert" *ngIf="p.esAlerta">ALERTA</span>
+            </div>
+          </div>
+
+          <button class="btn icon" (click)="toggleLike(p.id)" [class.active]="p.yoLike" title="Like">
+            ❤️ <span class="cnt">{{ p.likesCount }}</span>
+          </button>
         </div>
 
-        <div class="pc-divider my-3"></div>
+        <div class="post-body">
+          {{ p.contenido }}
+        </div>
 
-        <div class="fw-semibold">Publicar</div>
-        <form class="d-grid gap-2 mt-2" [formGroup]="postForm" (ngSubmit)="publishPost()">
-          <textarea class="form-control pc-input" rows="4" formControlName="contenido" placeholder="Escribe algo útil para tus vecinos..."></textarea>
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="alerta" formControlName="esAlerta" />
-              <label class="form-check-label" for="alerta">Es alerta</label>
+        <div class="post-bottom">
+          <button class="btn ghost sm" (click)="toggleComentarios(p.id)">
+            💬 Comentarios ({{ p.commentsCount }})
+          </button>
+        </div>
+
+        <div class="comments" *ngIf="mostrarComentarios[p.id]">
+          <div class="comment" *ngFor="let c of getComentariosDe(p.id)">
+            <div class="c-head">
+              <div class="c-name">{{ nombreDeUser(c.userId) }}</div>
+              <div class="c-date">{{ c.fechaCreacion }}</div>
             </div>
-            <button class="btn btn-primary pc-btn" type="submit"><i class="bi bi-send me-1"></i>Publicar</button>
+            <div class="c-body">{{ c.contenido }}</div>
           </div>
-          <div>
-            <label class="form-label small pc-muted">Imágenes (URLs, una por línea)</label>
-            <textarea class="form-control pc-input" rows="2" formControlName="imageUrls" placeholder="https://...
-https://..."></textarea>
+
+          <div class="comment-box">
+            <input
+              class="input"
+              placeholder="Escribe un comentario..."
+              [(ngModel)]="nuevoComentario[p.id]"
+              (keyup.enter)="comentar(p.id)"
+            />
+            <button class="btn primary sm" (click)="comentar(p.id)">Enviar</button>
           </div>
-        </form>
-      }
+        </div>
+      </div>
+
+      <div class="empty small" *ngIf="posts.length===0">
+        <div class="emoji">📝</div>
+        <div class="txt">
+          <div class="t">Todavía no hay posts</div>
+          <div class="s">Sé el primero en publicar algo en tu colonia.</div>
+        </div>
+        <button class="btn primary" (click)="abrirNuevoPost()">Publicar</button>
+      </div>
     </div>
   </div>
 
-  <div class="col-12 col-xl-8">
-    @if (!selectedColonia()) {
-      <div class="pc-card pc-shadow p-4">
-        <div class="h5 pc-title">Aún no hay colonia seleccionada</div>
-        <div class="pc-muted">Únete con un código o crea tu propia colonia.</div>
+  <ng-template #loadingTpl>
+    <div class="loading">
+      Cargando Red Vecinal...
+    </div>
+  </ng-template>
+</div>
+
+<!-- =======================
+     MODAL: CREAR COLONIA
+     ✅ Renombrado para no chocar con Bootstrap (.modal)
+======================= -->
+<div class="rv-overlay" *ngIf="modalCrearColonia" (click)="closeModals()">
+  <div class="rv-modal" (click)="$event.stopPropagation()">
+    <div class="rv-modal-head">
+      <h3>Crear colonia</h3>
+      <button class="rv-x" (click)="closeModals()">✕</button>
+    </div>
+
+    <div class="rv-modal-body">
+      <label>Nombre</label>
+      <input class="input" [(ngModel)]="crearNombre" placeholder="Ej. Blue Slide Park" />
+
+      <label>Código de invitación</label>
+      <div class="row">
+        <input class="input mono" [(ngModel)]="crearCodigo" maxlength="10" />
+        <button class="btn ghost sm" (click)="crearCodigo = generarCodigoInvitacion()">🔄</button>
       </div>
-    } @else {
-      <div class="d-grid gap-3">
-        @if (feed().length === 0) {
-          <div class="pc-card pc-shadow p-4">
-            <div class="h5 pc-title">Sin publicaciones</div>
-            <div class="pc-muted">Sé el primero en publicar algo en tu colonia.</div>
-          </div>
-        }
+      <div class="hint">Tip: comparte este código con tus vecinos.</div>
+    </div>
 
-        @for (p of feed(); track p.id) {
-          <div class="pc-card pc-shadow p-3" [class.alerta]="p.esAlerta">
-            <div class="d-flex align-items-start justify-content-between gap-2">
-              <div>
-                <div class="fw-semibold">{{ userName(p.usuarioId) }}</div>
-                <div class="small pc-muted">{{ format(p.fechaCreacion) }}</div>
-              </div>
-              @if (p.esAlerta) { <span class="pc-badge"><i class="bi bi-exclamation-triangle me-1"></i>Alerta</span> }
-            </div>
-
-            <div class="mt-2" style="white-space: pre-wrap;">{{ p.contenido }}</div>
-
-            @if (imagesForPost(p.id).length > 0) {
-              <div class="pc-post-grid mt-3">
-                @for (im of imagesForPost(p.id); track im.id) {
-                  <img [src]="im.imagePath" alt="" />
-                }
-              </div>
-            }
-
-            <div class="d-flex flex-wrap gap-2 mt-3">
-              <button class="btn btn-outline-light pc-btn" (click)="toggleLike(p)">
-                <i class="bi" [class.bi-heart-fill]="isLikedByMe(p.id)" [class.bi-heart]="!isLikedByMe(p.id)"></i>
-                <span class="ms-1">{{ likesCount(p.id) }}</span>
-              </button>
-              <button class="btn btn-outline-light pc-btn" (click)="toggleComments(p.id)">
-                <i class="bi bi-chat"></i>
-                <span class="ms-1">{{ commentsFor(p.id).length }}</span>
-              </button>
-            </div>
-
-            @if (expandedComments()[p.id || -1]) {
-              <div class="pc-divider my-3"></div>
-              <div class="d-grid gap-2">
-                @for (c of commentsFor(p.id); track c.id) {
-                  <div class="pc-surface p-2">
-                    <div class="d-flex align-items-center justify-content-between">
-                      <div class="small fw-semibold">{{ userName(c.userId) }}</div>
-                      <div class="small pc-muted">{{ format(c.fechaCreacion) }}</div>
-                    </div>
-                    <div class="small" style="white-space: pre-wrap;">{{ c.contenido }}</div>
-                  </div>
-                }
-              </div>
-
-              <form class="mt-3" [formGroup]="commentForms()[p.id || -1]" (ngSubmit)="submitComment(p.id!)">
-                <div class="d-flex gap-2">
-                  <input class="form-control pc-input" formControlName="contenido" placeholder="Escribe un comentario…" />
-                  <button class="btn btn-primary pc-btn" type="submit"><i class="bi bi-send"></i></button>
-                </div>
-              </form>
-            }
-          </div>
-        }
-      </div>
-    }
+    <div class="rv-modal-foot">
+      <button class="btn ghost" (click)="closeModals()">Cancelar</button>
+      <button class="btn primary" (click)="crearColonia()">Crear</button>
+    </div>
   </div>
 </div>
 
-<app-modal [open]="showCreate()" title="Crear colonia" (closed)="showCreate.set(false)">
-  <form class="d-grid gap-3" [formGroup]="createColoniaForm" (ngSubmit)="createColonia()">
-    <div>
-      <label class="form-label">Nombre</label>
-      <input class="form-control pc-input" formControlName="nombre" placeholder="Mi colonia" />
+<!-- =======================
+     MODAL: UNIRME
+======================= -->
+<div class="rv-overlay" *ngIf="modalUnirme" (click)="closeModals()">
+  <div class="rv-modal" (click)="$event.stopPropagation()">
+    <div class="rv-modal-head">
+      <h3>Unirme a una colonia</h3>
+      <button class="rv-x" (click)="closeModals()">✕</button>
     </div>
-    <div>
-      <label class="form-label">Código de invitación</label>
-      <input class="form-control pc-input" formControlName="codigoInvitacion" />
-      <div class="pc-muted small mt-1">Tip: comparte este código con tus vecinos.</div>
-    </div>
-    <div class="d-flex justify-content-end gap-2">
-      <button type="button" class="btn btn-outline-light pc-btn" (click)="showCreate.set(false)">Cancelar</button>
-      <button class="btn btn-primary pc-btn" type="submit">Crear</button>
-    </div>
-  </form>
-</app-modal>
 
-<app-modal [open]="showJoin()" title="Unirme a una colonia" (closed)="showJoin.set(false)">
-  <form class="d-grid gap-3" [formGroup]="joinForm" (ngSubmit)="join()">
-    <div>
-      <label class="form-label">Código de invitación</label>
-      <input class="form-control pc-input" formControlName="codigoInvitacion" placeholder="ABCDEFGH" />
+    <div class="rv-modal-body">
+      <label>Código de invitación</label>
+      <input class="input mono" [(ngModel)]="unirmeCodigo" placeholder="Ej. HDQXWYU9" />
     </div>
-    <div class="d-flex justify-content-end gap-2">
-      <button type="button" class="btn btn-outline-light pc-btn" (click)="showJoin.set(false)">Cancelar</button>
-      <button class="btn btn-primary pc-btn" type="submit">Unirme</button>
+
+    <div class="rv-modal-foot">
+      <button class="btn ghost" (click)="closeModals()">Cancelar</button>
+      <button class="btn primary" (click)="unirmeColonia()">Unirme</button>
     </div>
-  </form>
-</app-modal>
+  </div>
+</div>
+
+<!-- =======================
+     MODAL: NUEVO POST
+======================= -->
+<div class="rv-overlay" *ngIf="modalNuevoPost" (click)="closeModals()">
+  <div class="rv-modal" (click)="$event.stopPropagation()">
+    <div class="rv-modal-head">
+      <h3>Nueva publicación</h3>
+      <button class="rv-x" (click)="closeModals()">✕</button>
+    </div>
+
+    <div class="rv-modal-body">
+      <label>Contenido</label>
+      <textarea class="textarea" [(ngModel)]="postContenido" rows="5" placeholder="¿Qué está pasando en tu colonia?"></textarea>
+
+      <div class="check">
+        <input type="checkbox" [(ngModel)]="postEsAlerta" id="alerta" />
+        <label for="alerta">Marcar como alerta</label>
+      </div>
+    </div>
+
+    <div class="rv-modal-foot">
+      <button class="btn ghost" (click)="closeModals()">Cancelar</button>
+      <button class="btn primary" (click)="publicarPost()">Publicar</button>
+    </div>
+  </div>
+</div>
