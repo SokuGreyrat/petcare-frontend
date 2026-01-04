@@ -8,7 +8,7 @@ Instala dependencias:
 npm install
 ```
 
-### Backend desplegado (Render)
+### Backend desplegado (Render) solo demo
 
 ```bash
 npm run start:remote
