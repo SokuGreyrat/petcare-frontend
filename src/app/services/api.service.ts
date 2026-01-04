@@ -25,7 +25,7 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
-  private base = '/api/petcare';
+  private base = 'https://petcare-t2bx.onrender.com/api/petcare';
 
   constructor(private http: HttpClient) {}
 
