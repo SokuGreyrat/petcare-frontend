@@ -1,175 +1,163 @@
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-  <div>
-    <div class="h3 m-0 pc-title">Perfil</div>
-    <div class="pc-muted">Edita tus datos y tu foto de perfil.</div>
-  </div>
-  <button class="btn btn-outline-light pc-btn" (click)="loadStats()" title="Actualizar resumen">
-    <i class="bi bi-arrow-clockwise"></i>
-  </button>
+<!-- Toast -->
+<div class="pc-toast" *ngIf="toastVisible" [class.bad]="toastType==='bad'">
+  {{ toastMsg }}
 </div>
 
-<div class="row g-3 mt-1">
-  <div class="col-12 col-xl-4">
-    <div class="pc-card pc-shadow p-3">
-      <div class="d-flex align-items-center gap-3">
-        <div class="pc-profile-avatar">
-          @if (me().fotoPerfil) {
-            <img [src]="me().fotoPerfil" alt="Foto de perfil" />
-          } @else {
-            <span>{{ initials() }}</span>
-          }
-        </div>
-        <div style="min-width: 0">
-          <div class="h5 m-0 pc-title text-truncate">{{ me().nombre }}</div>
-          <div class="pc-muted text-truncate">{{ me().email }}</div>
-          <div class="d-flex flex-wrap gap-2 mt-2">
-            <span class="pc-badge"><i class="bi bi-person-badge me-1"></i>ID #{{ me().id }}</span>
-            <span class="pc-badge"><i class="bi bi-shield-lock me-1"></i>Cuenta</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="pc-divider my-3"></div>
-
-      <div class="fw-semibold">Foto de perfil</div>
-      <div class="pc-muted small">Pega una URL de imagen (Drive, Imgur, etc.).</div>
-
-      <div class="mt-3">
-        <div class="pc-photo-preview">
-          @if (photoUrl.value) {
-            <img [src]="photoUrl.value" alt="Vista previa" />
-          } @else {
-            <div class="pc-muted"><i class="bi bi-image"></i></div>
-          }
-        </div>
-
-        <label class="form-label mt-3">URL</label>
-        <input class="form-control pc-input" [formControl]="photoUrl" placeholder="https://..." />
-
-        <button
-          class="btn btn-primary pc-btn w-100 mt-2"
-          (click)="savePhoto()"
-          [disabled]="busy() || !photoUrl.value.trim()"
-        >
-          @if (busy()) {
-            <span class="spinner-border spinner-border-sm me-2"></span>
-          }
-          Guardar foto
-        </button>
-      </div>
-    </div>
-
-    <div class="pc-card pc-shadow p-3 mt-3">
-      <div class="h5 pc-title m-0">Resumen</div>
-      <div class="pc-muted small">Tu actividad en la plataforma</div>
-      <div class="pc-divider my-3"></div>
-
-      @if (statsLoading()) {
-        <div class="pc-muted">
-          <span class="spinner-border spinner-border-sm me-2"></span>
-          Cargando…
-        </div>
-      } @else {
-        <div class="row g-2">
-          <div class="col-6">
-            <div class="pc-surface p-3">
-              <div class="pc-muted small">Mascotas</div>
-              <div class="h4 m-0">{{ stats().mascotas ?? '—' }}</div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="pc-surface p-3">
-              <div class="pc-muted small">Posts</div>
-              <div class="h4 m-0">{{ stats().posts ?? '—' }}</div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="pc-surface p-3">
-              <div class="pc-muted small">Adopciones</div>
-              <div class="h4 m-0">{{ stats().adopciones ?? '—' }}</div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="pc-surface p-3">
-              <div class="pc-muted small">Solicitudes</div>
-              <div class="h4 m-0">{{ stats().solicitudes ?? '—' }}</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="pc-divider my-3"></div>
-
-        <div class="pc-muted small">Mes actual</div>
-        <div class="d-flex justify-content-between mt-1">
-          <span class="pc-muted">Gasto</span>
-          <span class="fw-semibold">${{ stats().gastoMes ?? 0 }}</span>
-        </div>
-        <div class="d-flex justify-content-between mt-1">
-          <span class="pc-muted">Presupuesto</span>
-          <span class="fw-semibold">@if (stats().budgetMes != null) { ${{ stats().budgetMes }} } @else { — }</span>
-        </div>
-
-        @if (stats().budgetMes != null) {
-          <div class="progress mt-2 pc-budget" style="height: 7px; background: rgba(255,255,255,0.08)">
-            <div class="progress-bar" role="progressbar" [style.width]="budgetPct() + '%'"></div>
-          </div>
-          <div class="small pc-muted mt-2">{{ budgetHint() }}</div>
-        }
-      }
+<div class="perfil-wrap">
+  <div class="perfil-head">
+    <div>
+      <h1>Perfil</h1>
+      <p>Edita tus datos y tu foto de perfil</p>
     </div>
   </div>
 
-  <div class="col-12 col-xl-8">
-    <div class="pc-card pc-shadow p-3">
-      <div class="d-flex align-items-center justify-content-between gap-2">
-        <div>
-          <div class="h5 m-0 pc-title">Datos del perfil</div>
-          <div class="pc-muted small">Estos datos se muestran en la plataforma.</div>
-        </div>
-        <span class="pc-badge"><i class="bi bi-info-circle me-1"></i>Sin edición de contraseña</span>
+  <div class="perfil-grid">
+    <!-- Foto -->
+    <section class="pc-card">
+      <div class="pc-card-h">
+        <h2>Foto de perfil</h2>
+        <p>Pega una URL de imagen (Drive, Imgur, etc.).</p>
       </div>
 
-      <div class="pc-divider my-3"></div>
+      <div class="photo-box">
+        <ng-container *ngIf="(user.fotoPerfil || photoUrl); else noPhoto">
+          <img
+            [src]="(photoUrl || user.fotoPerfil)!"
+            alt="Foto de perfil"
+            (error)="toast('La URL no parece ser una imagen válida.', 'bad')"
+          />
+        </ng-container>
 
-      <form class="row g-2" [formGroup]="form" (ngSubmit)="save()">
-        <div class="col-12 col-md-6">
-          <label class="form-label">Nombre</label>
-          <input class="form-control pc-input" formControlName="nombre" placeholder="Tu nombre" />
-          @if (form.controls.nombre.touched && form.controls.nombre.invalid) {
-            <div class="text-warning small mt-1">El nombre es obligatorio.</div>
-          }
-        </div>
-        <div class="col-12 col-md-6">
-          <label class="form-label">Correo</label>
-          <input class="form-control pc-input" formControlName="email" type="email" placeholder="tu@correo.com" />
-          @if (form.controls.email.touched && form.controls.email.invalid) {
-            <div class="text-warning small mt-1">Ingresa un correo válido.</div>
-          }
-        </div>
-        <div class="col-12 col-md-6">
-          <label class="form-label">Teléfono (opcional)</label>
-          <input class="form-control pc-input" formControlName="telefonoCelular" placeholder="55..." />
-        </div>
-        <div class="col-12 col-md-6">
-          <label class="form-label">CURP (opcional)</label>
-          <input class="form-control pc-input" formControlName="curp" placeholder="XXXX000000XXXXXX00" />
+        <ng-template #noPhoto>
+          <div class="photo-empty">
+            <div class="ph-ic">🖼</div>
+            <div class="ph-t">Sin foto</div>
+          </div>
+        </ng-template>
+      </div>
+
+      <label class="lbl">URL</label>
+      <input class="inp" [(ngModel)]="photoUrl" placeholder="https://..." />
+
+      <button class="btn primary" (click)="guardarFoto()" [disabled]="savingPhoto || loading">
+        <span *ngIf="!savingPhoto">Guardar foto</span>
+        <span *ngIf="savingPhoto">Guardando...</span>
+      </button>
+    </section>
+
+    <!-- Datos -->
+    <section class="pc-card wide">
+      <div class="pc-card-h">
+        <h2>Datos del perfil</h2>
+        <p>Estos datos se muestran en la plataforma.</p>
+      </div>
+
+      <div class="form-grid">
+        <div>
+          <label class="lbl">Nombre</label>
+          <input class="inp" [(ngModel)]="user.nombre" placeholder="Tu nombre" />
         </div>
 
-        <div class="col-12 d-flex justify-content-end gap-2 mt-2">
-          <button class="btn btn-primary pc-btn" type="submit" [disabled]="busy()">
-            @if (busy()) { <span class="spinner-border spinner-border-sm me-2"></span> }
-            Guardar cambios
-          </button>
+        <div>
+          <label class="lbl">Correo</label>
+          <input class="inp" [(ngModel)]="user.email" placeholder="correo@algo.com" />
         </div>
-      </form>
+
+        <div>
+          <label class="lbl">Teléfono (opcional)</label>
+          <input class="inp" [(ngModel)]="user.telefonoCelular" placeholder="55..." />
+        </div>
+
+        <div>
+          <label class="lbl">CURP (opcional)</label>
+          <input class="inp" [(ngModel)]="user.curp" placeholder="..." />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn ghost" (click)="loadUser()" [disabled]="loading || savingProfile">
+          Recargar
+        </button>
+
+        <button class="btn primary" (click)="guardarCambios()" [disabled]="savingProfile || loading">
+          <span *ngIf="!savingProfile">Guardar cambios</span>
+          <span *ngIf="savingProfile">Guardando...</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ✅ Resumen como antes + datos -->
+    <section class="pc-card wide">
+      <div class="pc-card-h">
+        <h2>Resumen</h2>
+        <p>Tu actividad en la plataforma</p>
+      </div>
+
+      <!-- Recuadros como estaba -->
+      <div class="stats-grid">
+        <div class="statbox">
+          <div class="st-title">Mascotas</div>
+          <div class="st-value">{{ getStat(stats.mascotas) }}</div>
+        </div>
+
+        <div class="statbox">
+          <div class="st-title">Posts</div>
+          <div class="st-value">{{ getStat(stats.posts) }}</div>
+        </div>
+
+        <div class="statbox">
+          <div class="st-title">Adopciones</div>
+          <div class="st-value">{{ getStat(stats.adopciones) }}</div>
+        </div>
+
+        <div class="statbox">
+          <div class="st-title">Solicitudes</div>
+          <div class="st-value">{{ getStat(stats.solicitudes) }}</div>
+        </div>
+      </div>
+
+      <!-- Datos (los de la foto) -->
+      <div class="summary-divider"></div>
+
+      <div class="summary-title">Datos rápidos</div>
+
+      <div class="summary-table">
+        <div class="srow" *ngFor="let r of summaryRows">
+          <div class="sk">{{ r.label }}</div>
+          <div class="sv" [class.ok]="r.tone==='ok'" [class.warn]="r.tone==='warn'">
+            {{ r.value }}
+          </div>
+        </div>
+      </div>
+
+      <div class="summary-hint">
+        Si algo se ve desactualizado, presiona <b>Recargar</b>.
+      </div>
+    </section>
+  </div>
+
+  <div class="loading" *ngIf="loading">
+    <div class="spinner"></div>
+    <div>Cargando perfil...</div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="pc-backdrop" *ngIf="modal !== 'none'" (click)="closeModal()"></div>
+
+<div class="pc-modal-wrap" *ngIf="modal !== 'none'" (click)="closeModal()">
+  <div class="pc-modal" (click)="$event.stopPropagation()">
+    <div class="pc-modal-h">
+      <div class="pc-title">{{ modalTitle }}</div>
+      <button class="xbtn" (click)="closeModal()">✕</button>
     </div>
 
-    <div class="pc-card pc-shadow p-3 mt-3">
-      <div class="h5 pc-title m-0">Privacidad</div>
-      <div class="pc-muted small mt-1">
-        En esta versión la contraseña no se edita desde el front. La actualización conserva tu contraseña actual en el
-        servidor.
-      </div>
+    <div class="pc-modal-b">
+      <p>{{ modalText }}</p>
+    </div>
+
+    <div class="pc-modal-a">
+      <button class="btn primary" (click)="closeModal()">OK</button>
     </div>
   </div>
 </div>
