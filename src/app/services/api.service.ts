@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 import {
   Adopcion,
   Colonia,
@@ -25,7 +26,7 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
-  private base = 'https://petcare-t2bx.onrender.com/api/petcare';
+  private base = environment.apiUrl + '/api/petcare';
 
   constructor(private http: HttpClient) {}
 
