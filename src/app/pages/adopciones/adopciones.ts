@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 
 type Vista = 'explorar' | 'misPublicaciones' | 'misSolicitudes';
 
@@ -12,7 +12,6 @@ interface Adopcion {
   disponible: boolean;
   fechaPublicacion?: string;
 
-  // si tu backend ya regresa algunos datos “enriquecidos”
   mascotaNombre?: string;
   mascotaTipo?: string;
   mascotaRaza?: string;
@@ -33,20 +32,17 @@ interface Mascota {
   tipo?: string;
   raza?: string;
 
-  // posibles campos extra:
   edad?: number | string;
   sexo?: string;
   descripcion?: string;
 
-  // foto / imagen (intentamos varias llaves)
-  foto?: string;
+  foto?: any;
   fotoUrl?: string;
-  imagen?: string;
+  imagen?: any;
   imagenUrl?: string;
   urlImagen?: string;
   photoUrl?: string;
 
-  // dueño (distintas variantes)
   usuarioId?: number;
   idUsuario?: number;
   usuario?: { id?: number; usuarioId?: number; nombre?: string; nombreCompleto?: string; email?: string };
@@ -63,6 +59,12 @@ interface Usuario {
   email?: string;
 }
 
+interface ImagenMascota {
+  id?: number;
+  mascotaId: number;
+  url: string; // url o ruta o base64 normalizada
+}
+
 @Component({
   selector: 'app-adopciones',
   standalone: true,
@@ -72,6 +74,24 @@ interface Usuario {
 })
 export class AdopcionesComponent implements OnInit {
   private readonly API = '/api/petcare';
+
+  // Placeholder para cuando no haya foto
+  private readonly IMG_PLACEHOLDER =
+    'data:image/svg+xml;utf8,' +
+    encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="140" height="140" viewBox="0 0 140 140">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#2b3558"/>
+            <stop offset="1" stop-color="#101628"/>
+          </linearGradient>
+        </defs>
+        <rect width="140" height="140" rx="24" fill="url(#g)"/>
+        <circle cx="70" cy="60" r="26" fill="rgba(255,255,255,.08)"/>
+        <path d="M50 96c4-10 36-10 40 0 3 7-4 14-20 14s-23-7-20-14z" fill="rgba(255,255,255,.08)"/>
+        <text x="70" y="66" text-anchor="middle" font-family="system-ui,Segoe UI,Arial" font-size="20" fill="rgba(255,255,255,.55)">🐾</text>
+      </svg>
+    `);
 
   vista: Vista = 'explorar';
   userId: number | null = null;
@@ -83,15 +103,14 @@ export class AdopcionesComponent implements OnInit {
   misSolicitudes: SolicitudAdopcion[] = [];
   inventario: Mascota[] = [];
 
-  // Mapas para “enriquecer” UI
   private mascotasById = new Map<number, Mascota>();
   private usuariosById = new Map<number, Usuario>();
 
-  // Para marcar “ya solicitaste” (adopcionId -> solicitud)
   private solicitudByAdopcionId = new Map<number, SolicitudAdopcion>();
-
-  // Para marcar en inventario si está “en adopción”
   private adopcionByMascotaId = new Map<number, Adopcion>();
+
+  // ✅ AQUÍ guardamos la foto real por mascotaId
+  private fotoByMascotaId = new Map<number, string>();
 
   // Modal Solicitud
   modalSolicitudOpen = false;
@@ -105,7 +124,7 @@ export class AdopcionesComponent implements OnInit {
   // Toast
   toastMsg = '';
   toastVisible = false;
-  private toastTimer?: any;
+  private toastTimer?: ReturnType<typeof setTimeout>;
 
   constructor(private http: HttpClient) {}
 
@@ -121,10 +140,10 @@ export class AdopcionesComponent implements OnInit {
   refrescarTodo(): void {
     this.cargando = true;
 
-    // 1) Adopciones (explorar)
+    // 1) Adopciones
     this.http.get<any>(`${this.API}/alladopciones`).subscribe({
       next: (data) => {
-        this.adopciones = this.normalizeList<Adopcion>(data);
+        this.adopciones = this.normalizeList<any>(data).map((x) => this.normalizeAdopcion(x));
         this.recalcularDerivados();
         this.cargando = false;
       },
@@ -135,11 +154,11 @@ export class AdopcionesComponent implements OnInit {
       }
     });
 
-    // 2) Solicitudes (para marcar “ya solicitaste”)
+    // 2) Solicitudes
     this.http.get<any>(`${this.API}/allsolicitudes-adopcion`).subscribe({
       next: (data) => {
-        const all = this.normalizeList<SolicitudAdopcion>(data);
-        this.misSolicitudes = this.userId == null ? [] : all.filter(s => Number(s.solicitanteId) === this.userId);
+        const all = this.normalizeList<any>(data).map((x) => this.normalizeSolicitud(x));
+        this.misSolicitudes = this.userId == null ? [] : all.filter((s) => Number(s.solicitanteId) === this.userId);
         this.reconstruirSolicitudMap();
       },
       error: (err) => {
@@ -148,11 +167,14 @@ export class AdopcionesComponent implements OnInit {
       }
     });
 
-    // 3) Mascotas (para nombre/foto/características + inventario)
+    // 3) Mascotas
     this.cargarMascotas();
 
-    // 4) Usuarios (para nombre del dueño)
+    // 4) Usuarios
     this.cargarUsuarios();
+
+    // 5) ✅ Imágenes de mascotas (CLAVE)
+    this.cargarImagenesMascotas();
   }
 
   private cargarMascotas(): void {
@@ -175,27 +197,29 @@ export class AdopcionesComponent implements OnInit {
   }
 
   private procesarMascotas(data: any): void {
-    const list = this.normalizeList<Mascota>(data);
+    const list = this.normalizeList<any>(data).map((x) => this.normalizeMascota(x));
 
     this.mascotasById.clear();
     for (const m of list) this.mascotasById.set(Number(m.id), m);
 
-    // Inventario = mascotas del usuario logueado
     if (this.userId == null) {
       this.inventario = [];
+      this.recalcularDerivados();
       return;
     }
 
-    this.inventario = list.filter(m => this.getMascotaOwnerId(m) === this.userId);
+    this.inventario = list.filter((m) => this.getMascotaOwnerId(m) === this.userId);
     this.recalcularDerivados();
   }
 
   private cargarUsuarios(): void {
+    // ✅ Pon primero los que sí existen para evitar el 404 molesto
     const candidates = [
-      `${this.API}/allusuarios`,
       `${this.API}/allusers`,
+      `${this.API}/allusuarios`,
       `${this.API}/allusuario`,
-      `${this.API}/usuarios`
+      `${this.API}/usuarios`,
+      `${this.API}/users`
     ];
 
     const tryNext = (idx: number) => {
@@ -203,9 +227,47 @@ export class AdopcionesComponent implements OnInit {
 
       this.http.get<any>(candidates[idx]).subscribe({
         next: (data) => {
-          const list = this.normalizeList<Usuario>(data);
+          const list = this.normalizeList<any>(data).map((x) => this.normalizeUsuario(x));
           this.usuariosById.clear();
-          for (const u of list) this.usuariosById.set(Number((u as any).id), u);
+          for (const u of list) this.usuariosById.set(Number(u.id), u);
+        },
+        error: () => tryNext(idx + 1)
+      });
+    };
+
+    tryNext(0);
+  }
+
+  /**
+   * ✅ CLAVE PARA LAS FOTOS:
+   * en tu app de “mis-mascotas” el back responde a /allimagenesmascotas
+   */
+  private cargarImagenesMascotas(): void {
+    const candidates = [
+      `${this.API}/allimagenesmascotas`,
+      `${this.API}/allimagenesmascota`,
+      `${this.API}/imagenesmascotas`,
+      `${this.API}/imagenes-mascotas`
+    ];
+
+    const tryNext = (idx: number) => {
+      if (idx >= candidates.length) return;
+
+      this.http.get<any>(candidates[idx]).subscribe({
+        next: (data) => {
+          const list = this.normalizeList<any>(data).map((x) => this.normalizeImagenMascota(x));
+
+          // reconstruimos mapa
+          this.fotoByMascotaId.clear();
+          for (const img of list) {
+            const key = Number(img.mascotaId);
+            if (!key) continue;
+
+            // si hay varias, nos quedamos con la primera
+            if (!this.fotoByMascotaId.has(key)) {
+              this.fotoByMascotaId.set(key, img.url);
+            }
+          }
         },
         error: () => tryNext(idx + 1)
       });
@@ -215,22 +277,15 @@ export class AdopcionesComponent implements OnInit {
   }
 
   private recalcularDerivados(): void {
-    // Mis publicaciones
     this.misPublicaciones =
-      this.userId == null ? [] : this.adopciones.filter(a => Number(a.usuarioPublicadorId) === this.userId);
+      this.userId == null ? [] : this.adopciones.filter((a) => Number(a.usuarioPublicadorId) === this.userId);
 
-    // Mapa mascotaId -> adopcion (solo las mías, para marcar inventario)
     this.adopcionByMascotaId.clear();
-    for (const ad of this.misPublicaciones) {
-      this.adopcionByMascotaId.set(Number(ad.mascotaId), ad);
-    }
+    for (const ad of this.misPublicaciones) this.adopcionByMascotaId.set(Number(ad.mascotaId), ad);
   }
 
   private reconstruirSolicitudMap(): void {
     this.solicitudByAdopcionId.clear();
-
-    // si por alguna razón hay más de una solicitud para misma adopción,
-    // nos quedamos con la “más reciente” por id
     for (const s of this.misSolicitudes) {
       const key = Number(s.adopcionId);
       const prev = this.solicitudByAdopcionId.get(key);
@@ -249,13 +304,11 @@ export class AdopcionesComponent implements OnInit {
   // SOLICITAR ADOPCIÓN
   // --------------------------
   abrirModalSolicitud(adopcion: Adopcion): void {
-    // No pedir tu propia publicación
     if (this.userId != null && Number(adopcion.usuarioPublicadorId) === this.userId) {
       this.showToast('No puedes solicitar tu propia publicación.');
       return;
     }
 
-    // Si ya solicitaste, no abrir modal
     if (this.yaSolicite(adopcion)) {
       this.showToast('Ya solicitaste esta adopción.');
       return;
@@ -317,8 +370,6 @@ export class AdopcionesComponent implements OnInit {
   abrirModalPublicar(): void {
     this.selectedMascotaId = null;
     this.modalPublicarOpen = true;
-
-    // refresca inventario por si cambió
     this.cargarMascotas();
   }
 
@@ -337,7 +388,6 @@ export class AdopcionesComponent implements OnInit {
       return;
     }
 
-    // si ya está en adopción, bloquear
     if (this.adopcionByMascotaId.has(Number(this.selectedMascotaId))) {
       this.showToast('Esa mascota ya está publicada en adopción.');
       return;
@@ -391,7 +441,7 @@ export class AdopcionesComponent implements OnInit {
   }
 
   // --------------------------
-  // HELPERS UI (lo que te pidieron)
+  // HELPERS UI
   // --------------------------
   yaSolicite(ad: Adopcion): boolean {
     return this.solicitudByAdopcionId.has(Number(ad.id));
@@ -405,7 +455,6 @@ export class AdopcionesComponent implements OnInit {
     const m = this.mascotasById.get(Number(ad.mascotaId));
     if (m) return m;
 
-    // fallback si solo viene “enriquecido” desde adopción
     return {
       id: Number(ad.mascotaId),
       nombre: ad.mascotaNombre,
@@ -428,25 +477,38 @@ export class AdopcionesComponent implements OnInit {
     if (m.raza) parts.push(String(m.raza));
     if (m.edad !== undefined && m.edad !== null && String(m.edad) !== '') parts.push(`${m.edad} años`);
     if (m.sexo) parts.push(String(m.sexo));
-
     return parts.join(' · ');
   }
 
-  getFotoMascota(ad: Adopcion): string | null {
+  /**
+   * ✅ AQUÍ YA SALE LA FOTO:
+   * 1) Primero busca en /allimagenesmascotas (mapa por mascotaId)
+   * 2) Si no, fallback a campos directos en Mascota (por si existe)
+   * 3) Si no, placeholder
+   */
+  getFotoMascota(ad: Adopcion): string {
+    const mascotaId = Number(ad.mascotaId);
+
+    const fromMap = this.fotoByMascotaId.get(mascotaId);
+    if (fromMap) return fromMap;
+
+    // fallback por si algún back devuelve foto dentro de Mascota
     const m = this.getMascotaDeAdopcion(ad);
-    if (!m) return null;
-
-    const raw =
-      m.fotoUrl || m.imagenUrl || m.urlImagen || m.photoUrl || m.foto || m.imagen || null;
-
-    if (!raw) return null;
-
-    // si viene en base64 sin prefijo
-    if (raw.length > 200 && !raw.startsWith('data:image')) {
-      return `data:image/jpeg;base64,${raw}`;
+    if (m) {
+      const raw =
+        m.fotoUrl || m.imagenUrl || m.urlImagen || m.photoUrl || m.foto || m.imagen || null;
+      const resolved = this.resolveImageUrl(raw);
+      if (resolved) return resolved;
     }
 
-    return raw;
+    return this.IMG_PLACEHOLDER;
+  }
+
+  onImgError(ev: Event): void {
+    const el = ev.target as HTMLImageElement | null;
+    if (!el) return;
+    if (el.src === this.IMG_PLACEHOLDER) return;
+    el.src = this.IMG_PLACEHOLDER;
   }
 
   getNombreDueno(ad: Adopcion): string {
@@ -472,6 +534,164 @@ export class AdopcionesComponent implements OnInit {
   }
 
   // --------------------------
+  // NORMALIZADORES
+  // --------------------------
+  private normalizeAdopcion(x: any): Adopcion {
+    const id = this.pickNumber(x, ['id', 'adopcionId', 'idAdopcion']) ?? 0;
+    const mascotaId = this.pickNumber(x, ['mascotaId', 'idMascota', 'petId']) ?? 0;
+    const usuarioPublicadorId =
+      this.pickNumber(x, ['usuarioPublicadorId', 'publicadorId', 'usuarioId', 'idUsuario', 'userId']) ?? 0;
+
+    return {
+      id,
+      mascotaId,
+      usuarioPublicadorId,
+      disponible: Boolean(x?.disponible ?? x?.available ?? x?.estatus ?? true),
+      fechaPublicacion: x?.fechaPublicacion ?? x?.fecha ?? x?.createdAt,
+      mascotaNombre: x?.mascotaNombre ?? x?.nombreMascota,
+      mascotaTipo: x?.mascotaTipo ?? x?.tipoMascota,
+      mascotaRaza: x?.mascotaRaza ?? x?.razaMascota
+    };
+  }
+
+  private normalizeSolicitud(x: any): SolicitudAdopcion {
+    const id = this.pickNumber(x, ['id', 'solicitudId', 'idSolicitud']) ?? 0;
+    const adopcionId = this.pickNumber(x, ['adopcionId', 'idAdopcion']) ?? 0;
+    const solicitanteId = this.pickNumber(x, ['solicitanteId', 'usuarioId', 'idUsuario', 'userId']) ?? 0;
+
+    const estadoRaw = String(x?.estado ?? x?.status ?? 'pendiente').toLowerCase();
+    const estado: SolicitudAdopcion['estado'] =
+      estadoRaw === 'aceptada' || estadoRaw === 'aceptado'
+        ? 'aceptada'
+        : estadoRaw === 'rechazada' || estadoRaw === 'rechazado'
+          ? 'rechazada'
+          : 'pendiente';
+
+    return {
+      id,
+      adopcionId,
+      solicitanteId,
+      mensaje: x?.mensaje ?? x?.message ?? null,
+      estado,
+      fechaSolicitud: x?.fechaSolicitud ?? x?.fecha ?? x?.createdAt
+    };
+  }
+
+  private normalizeMascota(x: any): Mascota {
+    const id = this.pickNumber(x, ['id', 'idMascota', 'mascotaId', 'petId']) ?? 0;
+    const usuarioId = this.pickNumber(x, ['usuarioId', 'idUsuario', 'ownerId', 'userId']) ?? undefined;
+
+    return {
+      ...x,
+      id,
+      usuarioId,
+      nombre: x?.nombre ?? x?.name,
+      tipo: x?.tipo ?? x?.type,
+      raza: x?.raza ?? x?.breed,
+      edad: x?.edad ?? x?.age,
+      sexo: x?.sexo ?? x?.gender,
+      descripcion: x?.descripcion ?? x?.description
+    };
+  }
+
+  private normalizeUsuario(x: any): Usuario {
+    const id = this.pickNumber(x, ['id', 'idUsuario', 'usuarioId', 'userId', 'id_user']) ?? 0;
+    return {
+      ...x,
+      id,
+      nombre: x?.nombre ?? x?.name,
+      apellido: x?.apellido ?? x?.lastName,
+      apellidoPaterno: x?.apellidoPaterno ?? x?.apellido_paterno,
+      apellidoMaterno: x?.apellidoMaterno ?? x?.apellido_materno,
+      nombreCompleto: x?.nombreCompleto ?? x?.fullName,
+      username: x?.username ?? x?.userName,
+      email: x?.email
+    };
+  }
+
+  private normalizeImagenMascota(x: any): ImagenMascota {
+    const mascotaId =
+      this.pickNumber(x, ['mascotaId', 'idMascota', 'petId', 'id_pet']) ??
+      0;
+
+    // intentamos muchas llaves para la url
+    const rawUrl =
+      x?.url ||
+      x?.urlImagen ||
+      x?.imagenUrl ||
+      x?.fotoUrl ||
+      x?.path ||
+      x?.ruta ||
+      x?.link ||
+      x?.imagen ||
+      x?.foto ||
+      '';
+
+    const url = this.resolveImageUrl(rawUrl) ?? this.IMG_PLACEHOLDER;
+
+    return { id: this.pickNumber(x, ['id', 'idImagen', 'imageId']) ?? undefined, mascotaId, url };
+  }
+
+  private pickNumber(obj: any, keys: string[]): number | null {
+    for (const k of keys) {
+      const v = obj?.[k];
+      if (v === undefined || v === null || v === '') continue;
+      const n = Number(v);
+      if (!Number.isNaN(n)) return n;
+    }
+    return null;
+  }
+
+  // --------------------------
+  // RESOLVER URL/BASE64
+  // --------------------------
+  private resolveImageUrl(raw: any): string | null {
+    if (raw === undefined || raw === null) return null;
+    let v = String(raw).trim();
+    if (!v) return null;
+
+    if (v.startsWith('data:image')) return v;
+    if (/^https?:\/\//i.test(v)) return v;
+
+    // base64 pelón
+    if (v.length > 200 && !v.includes('/') && !v.includes('\\') && !v.includes('.')) {
+      return `data:image/jpeg;base64,${v}`;
+    }
+
+    // normaliza slashes
+    v = v.replace(/\\/g, '/').replace(/^"+|"+$/g, '').replace(/^'+|'+$/g, '');
+    if (!v) return null;
+
+    // si llega filename suelto
+    if (!v.includes('/')) {
+      // por si tu back sirve como “ver imagen”
+      return `${this.API}/urs/images/${encodeURIComponent(v)}`;
+    }
+
+    // si viene ya con /api
+    if (v.startsWith('/api/')) return v;
+
+    // si viene como /urs/images/archivo
+    if (v.includes('/urs/images/')) {
+      const file = v.substring(v.lastIndexOf('/urs/images/') + '/urs/images/'.length);
+      if (!file) return null;
+      return `${this.API}/urs/images/${encodeURIComponent(file)}`;
+    }
+
+    // si viene como /images/archivo
+    if (v.includes('/images/')) {
+      const file = v.substring(v.lastIndexOf('/images/') + '/images/'.length);
+      if (!file) return null;
+      return `${this.API}/images/${encodeURIComponent(file)}`;
+    }
+
+    // fallback: agarra el último segmento
+    const last = v.substring(v.lastIndexOf('/') + 1).trim();
+    if (!last) return null;
+    return `${this.API}/urs/images/${encodeURIComponent(last)}`;
+  }
+
+  // --------------------------
   // HELPERS BASE
   // --------------------------
   private showToast(msg: string): void {
@@ -494,12 +714,7 @@ export class AdopcionesComponent implements OnInit {
   }
 
   private getMascotaOwnerId(m: any): number | null {
-    const candidates = [
-      m?.usuarioId,
-      m?.idUsuario,
-      m?.usuario?.id,
-      m?.usuario?.usuarioId
-    ];
+    const candidates = [m?.usuarioId, m?.idUsuario, m?.ownerId, m?.userId, m?.usuario?.id, m?.usuario?.usuarioId];
 
     for (const c of candidates) {
       if (c !== undefined && c !== null && c !== '') {
@@ -511,7 +726,7 @@ export class AdopcionesComponent implements OnInit {
   }
 
   // --------------------------
-  // SESSION: lee userId desde localStorage (petcare.session.v1)
+  // SESSION
   // --------------------------
   private getCurrentUserId(): number | null {
     const directKeys = ['userId', 'usuarioId', 'idUsuario', 'id_usuario', 'idUser'];
@@ -536,7 +751,7 @@ export class AdopcionesComponent implements OnInit {
           s?.session?.userId,
           s?.session?.usuarioId,
           s?.data?.user?.id,
-          s?.data?.usuario?.id,
+          s?.data?.usuario?.id
         ];
 
         for (const v of candidates) {
