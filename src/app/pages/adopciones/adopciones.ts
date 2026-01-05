@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { environment } from  '../../../environments/environment';
 
 type Vista = 'explorar' | 'misPublicaciones' | 'misSolicitudes';
 
@@ -73,7 +74,7 @@ interface ImagenMascota {
   styleUrls: ['./adopciones.css']
 })
 export class AdopcionesComponent implements OnInit {
-  private readonly API = '/api/petcare';
+  private readonly API = `${environment.apiUrl}/petcare`;
 
   // Placeholder para cuando no haya foto
   private readonly IMG_PLACEHOLDER =
