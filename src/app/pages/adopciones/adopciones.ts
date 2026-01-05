@@ -74,7 +74,7 @@ interface ImagenMascota {
   styleUrls: ['./adopciones.css']
 })
 export class AdopcionesComponent implements OnInit {
-  private readonly API = `${environment.apiUrl}/petcare`;
+  private readonly API = `${environment.apiUrl}/api/petcare`;
 
   // Placeholder para cuando no haya foto
   private readonly IMG_PLACEHOLDER =
