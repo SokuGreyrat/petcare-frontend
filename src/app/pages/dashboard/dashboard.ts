@@ -50,7 +50,7 @@ export class Dashboard {
     this.reload();
   }
 
-  /** ✅ Obtiene el id del usuario logueado aunque venga como idUsuario/usuarioId */
+  /** Obtiene el id del usuario logueado aunque venga como idUsuario/usuarioId */
   private meId(): number {
     try {
       const me: any = this.auth.requireUser();

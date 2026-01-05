@@ -5,6 +5,10 @@ import { ApiService } from './api.service';
 import { Usuario } from '../models/api.models';
 
 const LS_KEY = 'petcare.session.v1';
+const LS_KEY2 = 'userId';
+
+const LS_LOGIN_AT = 'petcare.loginAt';
+const SESSION_MAX_MIN = 30;
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -19,22 +23,29 @@ export class AuthService {
   private hydrate(): void {
     try {
       const raw = localStorage.getItem(LS_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as Usuario;
-      if (parsed && typeof parsed.id === 'number') {
-        this._user.set(parsed);
-      }
-    } catch {
-      // ignore
+      const loginAt = localStorage.getItem(LS_LOGIN_AT);
+      if (!raw || !loginAt) return;
+
+    const elapsedMin = (Date.now() - Number(loginAt)) / 60000;
+    if (elapsedMin > SESSION_MAX_MIN) {
+      this.logout();
+      return;
     }
+
+    this._user.set(JSON.parse(raw));
+  } catch {
+    this.logout();
+  }
   }
 
   private persist(u: Usuario | null): void {
     if (!u) {
       localStorage.removeItem(LS_KEY);
+      localStorage.removeItem(LS_KEY2);
       return;
     }
     localStorage.setItem(LS_KEY, JSON.stringify(u));
+    localStorage.setItem(LS_LOGIN_AT, Date.now().toString());
   }
 
   async login(email: string, password: string): Promise<Usuario | null> {
