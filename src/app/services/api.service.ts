@@ -26,7 +26,7 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
-  private base = environment.apiUrl + '/api/petcare';
+  private base = `${environment.apiUrl.replace(/\/$/, '')}/api/petcare`;
 
   constructor(private http: HttpClient) {}
 
