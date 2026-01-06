@@ -32,7 +32,7 @@ body {
 }
 
 a {
-  color: inherit;
+  color: #ffffff;
 }
 
 .pc-surface {
@@ -117,9 +117,6 @@ a {
 .pc-link:hover {
   color: white;
   text-decoration: underline;
-}
-.card {
-  color: #ffffff;
 }
 
 /* Sweet scrollbar */
