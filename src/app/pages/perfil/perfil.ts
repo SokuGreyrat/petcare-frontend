@@ -115,6 +115,9 @@ export class Perfil implements OnInit {
     this.reloadFromDb();
   }
 
+  loadUser(): void {
+  void this.reloadFromDb();
+}
   // =====================================================
   // ✅ Cargar TODO desde BD
   // =====================================================
