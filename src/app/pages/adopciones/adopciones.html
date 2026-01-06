@@ -19,6 +19,9 @@
         <button class="tab" [class.active]="vista==='misSolicitudes'" (click)="setVista('misSolicitudes')">
           Mis solicitudes
         </button>
+        <button class="tab" [class.active]="vista==='solicitudesRecibidas'" (click)="setVista('solicitudesRecibidas')">
+          Solicitudes recibidas
+        </button>
       </div>
     </div>
 
@@ -28,218 +31,322 @@
     </div>
   </div>
 
-  <div class="layout">
-    <!-- LISTA PRINCIPAL -->
-    <div class="left">
-      <div *ngIf="cargando" class="loading">Cargando...</div>
+  <!-- EXPLORAR -->
+  <section *ngIf="vista==='explorar'">
+    <div class="grid">
+      <div class="card" *ngFor="let ad of listaExplorar">
+        <div class="card-head">
+          <div class="pet">
+            <ng-container *ngIf="getFotoMascota(ad) as foto; else nofoto">
+              <img class="pet-img" [src]="foto" alt="Foto mascota">
+            </ng-container>
+            <ng-template #nofoto>
+              <div class="pet-ph">{{ getNombreMascota(ad).charAt(0) }}</div>
+            </ng-template>
 
-      <!-- Explorar -->
-      <ng-container *ngIf="vista==='explorar'">
-        <div *ngFor="let ad of adopciones" class="card">
-          <div class="card-head">
-            <div class="pet-row">
-              <!-- Foto -->
-              <ng-container *ngIf="getFotoMascota(ad) as foto; else nofoto">
-                <img class="pet-img" [src]="foto" alt="Foto mascota">
-              </ng-container>
-              <ng-template #nofoto>
-                <div class="pet-ph">{{ getNombreMascota(ad).charAt(0) }}</div>
-              </ng-template>
+            <div class="pet-info">
+              <div class="title">{{ getNombreMascota(ad) }}</div>
+              <div class="meta" *ngIf="getCaracteristicasMascota(ad)">
+                {{ getCaracteristicasMascota(ad) }}
+              </div>
+              <div class="meta">
+                Dueño: <b>{{ getNombreDueno(ad) }}</b>
+                <span *ngIf="ad.fechaPublicacion"> · {{ ad.fechaPublicacion }}</span>
+              </div>
+            </div>
+          </div>
 
-              <!-- Info -->
-              <div class="pet-info">
-                <div class="title">{{ getNombreMascota(ad) }}</div>
-                <div class="meta" *ngIf="getCaracteristicasMascota(ad)">
-                  {{ getCaracteristicasMascota(ad) }}
-                </div>
-                <div class="meta">
-                  Dueño: <b>{{ getNombreDueno(ad) }}</b>
-                  <span *ngIf="ad.fechaPublicacion"> · {{ ad.fechaPublicacion }}</span>
-                </div>
+          <div class="badge" [class.ok]="ad.disponible" [class.no]="!ad.disponible">
+            {{ ad.disponible ? 'Disponible' : 'No disponible' }}
+          </div>
+        </div>
 
-                <!-- Badge si ya solicitaste -->
-                <div class="badges" *ngIf="yaSolicite(ad)">
-                  <span class="badge requested">
-                    Ya solicitaste · {{ formatEstado(getSolicitudDe(ad)!.estado) }}
-                  </span>
+        <div class="card-actions">
+          <button class="btn small"
+                  [disabled]="!ad.disponible || yaSolicite(ad)"
+                  (click)="abrirModalSolicitar(ad)">
+            {{ yaSolicite(ad) ? 'Ya solicitaste' : 'Solicitar' }}
+          </button>
+          <button class="btn small ghost" (click)="verDetalles(ad)">Detalles</button>
+        </div>
+
+        <div class="hint" *ngIf="yaSolicite(ad)">
+          Estado: <b>{{ getEstadoMiSolicitud(ad) }}</b>
+        </div>
+      </div>
+    </div>
+
+    <div class="empty" *ngIf="listaExplorar?.length===0">
+      No hay publicaciones por mostrar.
+    </div>
+  </section>
+
+  <!-- MIS PUBLICACIONES -->
+  <section *ngIf="vista==='misPublicaciones'">
+    <div class="grid">
+      <div class="card" *ngFor="let ad of misPublicaciones">
+        <div class="card-head">
+          <div class="pet">
+            <ng-container *ngIf="getFotoMascota(ad) as foto; else nofoto2">
+              <img class="pet-img" [src]="foto" alt="Foto mascota">
+            </ng-container>
+            <ng-template #nofoto2>
+              <div class="pet-ph">{{ getNombreMascota(ad).charAt(0) }}</div>
+            </ng-template>
+
+            <div class="pet-info">
+              <div class="title">{{ getNombreMascota(ad) }}</div>
+              <div class="meta" *ngIf="getCaracteristicasMascota(ad)">
+                {{ getCaracteristicasMascota(ad) }}
+              </div>
+              <div class="meta" *ngIf="ad.fechaPublicacion">
+                Publicado: <b>{{ ad.fechaPublicacion }}</b>
+              </div>
+            </div>
+          </div>
+
+          <div class="badge" [class.ok]="ad.disponible" [class.no]="!ad.disponible">
+            {{ ad.disponible ? 'Disponible' : 'Cerrada' }}
+          </div>
+        </div>
+
+        <div class="card-actions">
+          <button class="btn small ghost" (click)="toggleDisponible(ad)">
+            {{ ad.disponible ? 'Cerrar' : 'Reabrir' }}
+          </button>
+          <button class="btn small danger" (click)="eliminarPublicacion(ad)">
+            Eliminar
+          </button>
+          <button class="btn small" (click)="verSolicitudesDePublicacion(ad)">
+            Ver solicitudes
+          </button>
+        </div>
+
+        <div class="hint" *ngIf="getCountSolicitudes(ad) as c; else nosol">
+          Solicitudes: <b>{{ c }}</b>
+        </div>
+        <ng-template #nosol>
+          <div class="hint">Sin solicitudes.</div>
+        </ng-template>
+      </div>
+    </div>
+
+    <div class="empty" *ngIf="misPublicaciones?.length===0">
+      Aún no has publicado ninguna mascota en adopción.
+    </div>
+  </section>
+
+  <!-- MIS SOLICITUDES -->
+  <section *ngIf="vista==='misSolicitudes'">
+    <div class="grid">
+      <div class="card" *ngFor="let sol of misSolicitudes">
+        <div class="card-head">
+          <div class="pet">
+            <ng-container *ngIf="getFotoMascotaBySolicitud(sol) as foto; else nofoto3">
+              <img class="pet-img" [src]="foto" alt="Foto mascota">
+            </ng-container>
+            <ng-template #nofoto3>
+              <div class="pet-ph">{{ getNombreMascotaBySolicitud(sol).charAt(0) }}</div>
+            </ng-template>
+
+            <div class="pet-info">
+              <div class="title">{{ getNombreMascotaBySolicitud(sol) }}</div>
+              <div class="meta" *ngIf="getCaracteristicasMascotaBySolicitud(sol)">
+                {{ getCaracteristicasMascotaBySolicitud(sol) }}
+              </div>
+              <div class="meta">
+                Estado: <b>{{ sol.estado }}</b>
+                <span *ngIf="sol.fechaSolicitud"> · {{ sol.fechaSolicitud }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="badge"
+               [class.pending]="sol.estado==='pendiente'"
+               [class.ok]="sol.estado==='aceptada'"
+               [class.no]="sol.estado==='rechazada'">
+            {{ sol.estado }}
+          </div>
+        </div>
+
+        <div class="hint" *ngIf="sol.mensaje">
+          "{{ sol.mensaje }}"
+        </div>
+
+        <div class="card-actions">
+          <button class="btn small danger" (click)="cancelarSolicitud(sol)" [disabled]="sol.estado!=='pendiente'">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="empty" *ngIf="misSolicitudes?.length===0">
+      No has enviado solicitudes todavía.
+    </div>
+  </section>
+
+  <!-- SOLICITUDES RECIBIDAS -->
+  <section *ngIf="vista==='solicitudesRecibidas'">
+    <div class="grid">
+      <div class="card" *ngFor="let item of solicitudesRecibidas">
+        <div class="card-head">
+          <div class="pet">
+            <ng-container *ngIf="getFotoMascotaByRecibida(item) as foto; else nofoto4">
+              <img class="pet-img" [src]="foto" alt="Foto mascota">
+            </ng-container>
+            <ng-template #nofoto4>
+              <div class="pet-ph">{{ getNombreMascotaByRecibida(item).charAt(0) }}</div>
+            </ng-template>
+
+            <div class="pet-info">
+              <div class="title">{{ getNombreMascotaByRecibida(item) }}</div>
+              <div class="meta" *ngIf="getCaracteristicasMascotaByRecibida(item)">
+                {{ getCaracteristicasMascotaByRecibida(item) }}
+              </div>
+              <div class="meta">
+                Solicitante: <b>{{ getNombreSolicitante(item) }}</b>
+                <span *ngIf="item.fechaSolicitud"> · {{ item.fechaSolicitud }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="badge"
+               [class.pending]="item.estado==='pendiente'"
+               [class.ok]="item.estado==='aceptada'"
+               [class.no]="item.estado==='rechazada'">
+            {{ item.estado }}
+          </div>
+        </div>
+
+        <div class="hint" *ngIf="item.mensaje">
+          "{{ item.mensaje }}"
+        </div>
+
+        <div class="card-actions">
+          <button class="btn small"
+                  (click)="aceptarSolicitud(item)"
+                  [disabled]="item.estado!=='pendiente'">
+            Aceptar
+          </button>
+          <button class="btn small danger"
+                  (click)="rechazarSolicitud(item)"
+                  [disabled]="item.estado!=='pendiente'">
+            Rechazar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="empty" *ngIf="solicitudesRecibidas?.length===0">
+      No tienes solicitudes recibidas por el momento.
+    </div>
+  </section>
+
+  <!-- MODALES -->
+  <div class="overlay" *ngIf="modalVisible" (click)="cerrarModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-head">
+        <div class="modal-title">{{ modalTitle }}</div>
+        <button class="icon" (click)="cerrarModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Publicar -->
+        <div *ngIf="modalTipo==='publicar'">
+          <div class="form">
+            <label>Mascota</label>
+            <select [(ngModel)]="formPublicar.mascotaId">
+              <option [ngValue]="null">Selecciona una mascota</option>
+              <option *ngFor="let m of misMascotas" [ngValue]="m.id">
+                {{ m.nombre || ('Mascota #' + m.id) }}
+              </option>
+            </select>
+
+            <label>Mensaje (opcional)</label>
+            <textarea [(ngModel)]="formPublicar.mensaje" rows="3" placeholder="Describe algo sobre la adopción..."></textarea>
+
+            <div class="modal-actions">
+              <button class="btn" (click)="publicar()">Publicar</button>
+              <button class="btn ghost" (click)="cerrarModal()">Cancelar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Solicitar -->
+        <div *ngIf="modalTipo==='solicitar'">
+          <div class="form">
+            <div class="mini">
+              <b>{{ modalMascotaNombre }}</b>
+              <span class="muted" *ngIf="modalMascotaInfo"> · {{ modalMascotaInfo }}</span>
+            </div>
+
+            <label>Mensaje (opcional)</label>
+            <textarea [(ngModel)]="formSolicitar.mensaje" rows="3" placeholder="Cuéntale al dueño por qué quieres adoptar..."></textarea>
+
+            <div class="modal-actions">
+              <button class="btn" (click)="enviarSolicitud()">Enviar solicitud</button>
+              <button class="btn ghost" (click)="cerrarModal()">Cancelar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Detalles -->
+        <div *ngIf="modalTipo==='detalles'">
+          <div class="details">
+            <div class="detail-row">
+              <div class="k">Mascota</div>
+              <div class="v">{{ modalMascotaNombre }}</div>
+            </div>
+            <div class="detail-row" *ngIf="modalMascotaInfo">
+              <div class="k">Características</div>
+              <div class="v">{{ modalMascotaInfo }}</div>
+            </div>
+            <div class="detail-row" *ngIf="modalDuenoNombre">
+              <div class="k">Dueño</div>
+              <div class="v">{{ modalDuenoNombre }}</div>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button class="btn ghost" (click)="cerrarModal()">Cerrar</button>
+          </div>
+        </div>
+
+        <!-- Lista solicitudes (mis publicaciones) -->
+        <div *ngIf="modalTipo==='solicitudesDePublicacion'">
+          <div class="list">
+            <div class="row" *ngFor="let s of modalSolicitudesPublicacion">
+              <div class="left">
+                <div class="t">{{ getNombreSolicitanteBySolicitud(s) }}</div>
+                <div class="m" *ngIf="s.mensaje">"{{ s.mensaje }}"</div>
+                <div class="d" *ngIf="s.fechaSolicitud">{{ s.fechaSolicitud }}</div>
+              </div>
+
+              <div class="right">
+                <span class="badge"
+                      [class.pending]="s.estado==='pendiente'"
+                      [class.ok]="s.estado==='aceptada'"
+                      [class.no]="s.estado==='rechazada'">
+                  {{ s.estado }}
+                </span>
+
+                <div class="row-actions">
+                  <button class="btn tiny" (click)="aceptarSolicitud(s)" [disabled]="s.estado!=='pendiente'">Aceptar</button>
+                  <button class="btn tiny danger" (click)="rechazarSolicitud(s)" [disabled]="s.estado!=='pendiente'">Rechazar</button>
                 </div>
               </div>
             </div>
 
-            <div class="pill" [class.ok]="ad.disponible" [class.no]="!ad.disponible">
-              {{ ad.disponible ? 'Disponible' : 'No disponible' }}
+            <div class="empty" *ngIf="modalSolicitudesPublicacion?.length===0">
+              Sin solicitudes para esta publicación.
             </div>
           </div>
 
-          <div class="card-actions">
-            <button class="btn primary"
-                    [disabled]="!ad.disponible || yaSolicite(ad) || (userId!=null && ad.usuarioPublicadorId===userId)"
-                    (click)="abrirModalSolicitud(ad)">
-              {{ yaSolicite(ad) ? 'Solicitada' : 'Solicitar' }}
-            </button>
+          <div class="modal-actions">
+            <button class="btn ghost" (click)="cerrarModal()">Cerrar</button>
           </div>
         </div>
-
-        <div *ngIf="!cargando && adopciones.length===0" class="empty">
-          No hay publicaciones por ahora.
-        </div>
-      </ng-container>
-
-      <!-- Mis publicaciones -->
-      <ng-container *ngIf="vista==='misPublicaciones'">
-        <div *ngFor="let ad of misPublicaciones" class="card">
-          <div class="card-head">
-            <div class="pet-row">
-              <ng-container *ngIf="getFotoMascota(ad) as foto; else nofoto2">
-                <img class="pet-img" [src]="foto" alt="Foto mascota">
-              </ng-container>
-              <ng-template #nofoto2>
-                <div class="pet-ph">{{ getNombreMascota(ad).charAt(0) }}</div>
-              </ng-template>
-
-              <div class="pet-info">
-                <div class="title">{{ getNombreMascota(ad) }}</div>
-                <div class="meta" *ngIf="getCaracteristicasMascota(ad)">
-                  {{ getCaracteristicasMascota(ad) }}
-                </div>
-                <div class="meta">Mascota #{{ ad.mascotaId }}</div>
-                <div class="meta" *ngIf="ad.fechaPublicacion">Publicado: {{ ad.fechaPublicacion }}</div>
-              </div>
-            </div>
-
-            <div class="pill" [class.ok]="ad.disponible" [class.no]="!ad.disponible">
-              {{ ad.disponible ? 'Disponible' : 'No disponible' }}
-            </div>
-          </div>
-
-          <div class="card-actions">
-            <button class="btn" (click)="toggleDisponibilidad(ad)">
-              Cambiar disponibilidad
-            </button>
-            <button class="btn danger" (click)="eliminarPublicacion(ad)">
-              Eliminar
-            </button>
-          </div>
-        </div>
-
-        <div *ngIf="!cargando && misPublicaciones.length===0" class="empty">
-          No tienes publicaciones.
-        </div>
-      </ng-container>
-
-      <!-- Mis solicitudes -->
-      <ng-container *ngIf="vista==='misSolicitudes'">
-        <div *ngFor="let s of misSolicitudes" class="card">
-          <div class="card-head">
-            <div>
-              <div class="title">Solicitud #{{ s.id }}</div>
-              <div class="meta">Adopción #{{ s.adopcionId }}</div>
-              <div class="meta" *ngIf="s.fechaSolicitud">Fecha: {{ s.fechaSolicitud }}</div>
-              <div class="meta" *ngIf="s.mensaje">Mensaje: {{ s.mensaje }}</div>
-            </div>
-
-            <div class="pill ok">
-              {{ formatEstado(s.estado) }}
-            </div>
-          </div>
-
-          <div class="card-actions">
-            <button class="btn danger"
-                    (click)="cancelarSolicitud(s)"
-                    [disabled]="s.estado !== 'pendiente'">
-              Cancelar
-            </button>
-          </div>
-        </div>
-
-        <div *ngIf="!cargando && misSolicitudes.length===0" class="empty">
-          No has enviado solicitudes.
-        </div>
-      </ng-container>
-    </div>
-
-    <!-- INVENTARIO -->
-    <div class="right">
-      <div class="panel">
-        <div class="panel-title">Tu inventario</div>
-        <div class="panel-sub">Mascotas que puedes publicar</div>
-
-        <div *ngIf="inventario.length===0" class="empty">
-          No tienes mascotas registradas.
-        </div>
-
-        <div *ngFor="let m of inventario" class="inv-item">
-          <div class="inv-left">
-            <div class="inv-name">{{ m.nombre || ('Mascota #' + m.id) }}</div>
-            <div class="inv-meta">
-              <span *ngIf="m.tipo">{{ m.tipo }}</span>
-              <span *ngIf="m.raza"> · {{ m.raza }}</span>
-            </div>
-          </div>
-
-          <!-- Marcado si ya está en adopción -->
-          <div class="inv-right" *ngIf="mascotaEnAdopcion(m.id) as ad">
-            <span class="badge inventory">
-              En adopción · {{ ad.disponible ? 'Disponible' : 'No disponible' }}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL SOLICITUD (pc- para no chocar con bootstrap) -->
-  <div class="pc-modal-backdrop" *ngIf="modalSolicitudOpen">
-    <div class="pc-modal">
-      <div class="pc-modal-head">
-        <div class="pc-modal-title">Solicitar adopción</div>
-        <button class="pc-modal-x" (click)="cerrarModalSolicitud()">✕</button>
-      </div>
-
-      <div class="pc-modal-body">
-        <div class="meta">
-          Vas a solicitar: <b>{{ getNombreMascota(selectedAdopcion!) }}</b>
-        </div>
-
-        <label class="label">Mensaje (opcional)</label>
-        <textarea class="textarea"
-                  [(ngModel)]="mensajeSolicitud"
-                  placeholder="Cuéntale al dueño por qué serías un buen adoptante..."></textarea>
-      </div>
-
-      <div class="pc-modal-actions">
-        <button class="btn" (click)="cerrarModalSolicitud()">Cancelar</button>
-        <button class="btn primary" (click)="enviarSolicitud()">Enviar solicitud</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL PUBLICAR -->
-  <div class="pc-modal-backdrop" *ngIf="modalPublicarOpen">
-    <div class="pc-modal">
-      <div class="pc-modal-head">
-        <div class="pc-modal-title">Publicar adopción</div>
-        <button class="pc-modal-x" (click)="cerrarModalPublicar()">✕</button>
-      </div>
-
-      <div class="pc-modal-body">
-        <label class="label">Selecciona una mascota</label>
-
-        <select class="select" [(ngModel)]="selectedMascotaId">
-          <option [ngValue]="null">-- Selecciona --</option>
-          <option *ngFor="let m of inventario" [ngValue]="m.id">
-            {{ m.nombre || ('Mascota #' + m.id) }}
-          </option>
-        </select>
-
-        <div class="hint" *ngIf="selectedMascotaId && mascotaEnAdopcion(selectedMascotaId)">
-          Esa mascota ya está publicada en adopción.
-        </div>
-      </div>
-
-      <div class="pc-modal-actions">
-        <button class="btn" (click)="cerrarModalPublicar()">Cancelar</button>
-        <button class="btn primary" (click)="publicarDesdeInventario()">Publicar</button>
       </div>
     </div>
   </div>
