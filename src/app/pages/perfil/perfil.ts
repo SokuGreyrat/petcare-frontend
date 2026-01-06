@@ -58,7 +58,7 @@ type SolicitudLite = { solicitanteId?: number | string | null; estado?: string |
   styleUrl: './perfil.css',
 })
 export class Perfil implements OnInit {
-  // SIN proxy, cambiar a: 'http://localhost:8080/api/petcare'
+  // Si NO usas proxy, cambia a: 'http://localhost:8080/api/petcare'
   private readonly API_BASE = '/api/petcare';
 
   private auth = inject(AuthService);
@@ -101,7 +101,7 @@ export class Perfil implements OnInit {
     solicitudes: null,
   };
 
-  // colonia real (sale de usuarios_colonias + colonias)
+  // ✅ colonia real (sale de usuarios_colonias + colonias)
   coloniaNombre: string = '—';
   coloniaCodigo: string = '—';
 
@@ -137,6 +137,7 @@ export class Perfil implements OnInit {
         idUsuario: (u as any).idUsuario ?? (u as any).id ?? this.userId,
         nombre: u.nombre ?? '',
         email: u.email ?? '',
+        // muchos backends NO regresan password por seguridad → lo conservamos de sesión
         password: (u as any).password ?? sessionPassword ?? '',
         curp: u.curp ?? '',
         telefonoCelular: u.telefonoCelular ?? '',
@@ -155,7 +156,7 @@ export class Perfil implements OnInit {
 
       this.photoUrl = (this.user as any).fotoPerfil ?? '';
 
-      
+      // ✅ aquí está la corrección real
       await this.loadColoniaFromRelacion();
 
       this.buildSummary();
@@ -167,17 +168,23 @@ export class Perfil implements OnInit {
     }
   }
 
+  // =========================
+  // ✅ Colonia: usuarios_colonias -> colonia/{id}
+  // =========================
   private async loadColoniaFromRelacion(): Promise<void> {
     if (!this.userId) return;
 
+    // por defecto
     this.coloniaNombre = '—';
     this.coloniaCodigo = '—';
 
+    // 1) trae relaciones user-colonia
     const rels = await this.safeFetchList<UsuariosColonia>(`${this.API_BASE}/allusuarios-colonias`);
     const mine = rels.filter(r => Number(r?.usuarioId) === Number(this.userId));
 
     if (!mine.length) return;
 
+    // si hay varias, agarra la más reciente por fechaRegistro (si viene)
     const pick = mine
       .slice()
       .sort((a, b) => this.toTime(b.fechaRegistro) - this.toTime(a.fechaRegistro))[0];
@@ -185,6 +192,7 @@ export class Perfil implements OnInit {
     const coloniaId = Number(pick?.coloniaId);
     if (!Number.isFinite(coloniaId) || coloniaId <= 0) return;
 
+    // 2) trae la colonia
     const col = await this.safeFetchJson<Colonia>(`${this.API_BASE}/colonia/${coloniaId}`);
     if (!col) return;
 
@@ -213,13 +221,17 @@ export class Perfil implements OnInit {
       { label: 'Verificado', value: ver ? 'Sí' : 'No', tone: ver ? 'ok' : 'warn' },
       { label: 'Registro', value: fecha || '—' },
 
+      // ✅ ya sale bien
       { label: 'Colonia', value: this.coloniaNombre || '—' },
 
+      // ✅ bonus: también viene del back y se ve cool en “Datos rápidos”
       { label: 'Código invitación', value: this.coloniaCodigo || '—' },
     ];
   }
 
-  
+  // =========================
+  // Conteos recuadros
+  // =========================
   private async loadCounts(): Promise<void> {
     if (!this.userId) return;
     const uid = Number(this.userId);
@@ -243,7 +255,9 @@ export class Perfil implements OnInit {
     }
   }
 
-  
+  // =========================
+  // Acciones
+  // =========================
   async guardarCambios(): Promise<void> {
     if (!this.userId) return;
 
@@ -279,6 +293,7 @@ export class Perfil implements OnInit {
         body: JSON.stringify(payload),
       });
 
+      // normaliza respuesta (a veces viene id, fotoPerfil, etc.)
       const merged: any = { ...this.user, ...updated };
       merged.idUsuario = merged.idUsuario ?? merged.id ?? this.userId;
       merged.fotoPerfil =
@@ -297,7 +312,7 @@ export class Perfil implements OnInit {
         fotoPerfil: (this.user as any).fotoPerfil ?? '',
       });
 
-      // refresca colonia 
+      // refresca colonia por si cambió la relación (o se unió a otra)
       await this.loadColoniaFromRelacion();
 
       this.buildSummary();
@@ -313,51 +328,46 @@ export class Perfil implements OnInit {
   }
 
   async guardarFoto(): Promise<void> {
-  if (!this.userId) return;
+    if (!this.userId) return;
 
-  const url = (this.photoUrl ?? '').trim();
-  if (!url) return this.toast('Pega una URL de imagen primero.', 'bad');
+    const url = (this.photoUrl ?? '').trim();
+    if (!url) return this.toast('Pega una URL de imagen primero.', 'bad');
 
-  // el backend pide password para actualizar usuario
-  if (!this.user?.password) {
-    return this.toast('No tengo tu password para guardar la foto. Cierra sesión e inicia de nuevo.', 'bad');
+    this.savingPhoto = true;
+    try {
+      const updated = await this.fetchJson<Usuario>(`${this.API_BASE}/create-user/photo-profile/${this.userId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ fotoPerfil: url }),
+      });
+
+      const foto = this.pickString(
+        (updated as any)?.fotoPerfil,
+        (updated as any)?.foto_perfil,
+        (updated as any)?.photoProfile,
+        url,
+      );
+
+      (this.user as any).fotoPerfil = foto ?? url;
+      this.photoUrl = (this.user as any).fotoPerfil ?? url;
+
+      // persiste en sesión para que no “desaparezca” al cambiar de página
+      this.patchSessionUser({ fotoPerfil: (this.user as any).fotoPerfil ?? url });
+
+      this.buildSummary();
+      await this.loadCounts();
+
+      this.toast('Foto guardada ✅', 'ok');
+      this.showModal('success', 'Foto actualizada', 'Se actualizó tu foto de perfil.');
+    } catch (e: any) {
+      this.showModal('error', 'No se pudo guardar la foto', this.humanError(e));
+    } finally {
+      this.savingPhoto = false;
+    }
   }
 
-  this.savingPhoto = true;
-  try {
-    // actualiza el usuario completo usando el endpoint que normalmente sí está permitido
-    const body = {
-      ...this.user,
-      fotoPerfil: url,
-      password: this.user.password,
-    };
-
-    const updated = await this.fetchJson<any>(`${this.API_BASE}/update-user/${this.userId}`, {
-      method: 'PUT',
-      body: JSON.stringify(body),
-    });
-
-    const foto = this.pickString(updated?.fotoPerfil, updated?.foto_perfil, updated?.photoProfile, url);
-
-    (this.user as any).fotoPerfil = foto ?? url;
-    this.photoUrl = (this.user as any).fotoPerfil ?? url;
-
-    // persiste para que no “desaparezca”
-    this.patchSessionUser({ fotoPerfil: (this.user as any).fotoPerfil ?? url });
-
-    this.buildSummary();
-    await this.loadCounts();
-
-    this.toast('Foto guardada ✅', 'ok');
-    this.showModal('success', 'Foto actualizada', 'Se actualizó tu foto de perfil.');
-  } catch (e: any) {
-    this.showModal('error', 'No se pudo guardar la foto', this.humanError(e));
-  } finally {
-    this.savingPhoto = false;
-  }
-}
-
-
+  // =========================
+  // UI helpers
+  // =========================
   toast(msg: string, type: 'ok' | 'bad' = 'ok'): void {
     this.toastMsg = msg;
     this.toastType = type;
