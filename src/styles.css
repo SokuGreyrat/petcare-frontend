@@ -118,6 +118,9 @@ a {
   color: white;
   text-decoration: underline;
 }
+.card {
+  color: #ffffff;
+}
 
 /* Sweet scrollbar */
 ::-webkit-scrollbar { width: 10px; }
