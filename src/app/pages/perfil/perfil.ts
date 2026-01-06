@@ -357,37 +357,42 @@ private readonly API_BASE = `${environment.apiUrl.replace(/\/$/, '')}/api/petcar
   const url = (this.photoUrl ?? '').trim();
   if (!url) return this.toast('Pega una URL de imagen primero.', 'bad');
 
-  const pass = this.ensurePasswordForUpdate();
-  if (!pass) return this.toast('No tengo tu password para guardar la foto. Cierra sesión e inicia de nuevo.', 'bad');
-
   this.savingPhoto = true;
   try {
-    // ✅ manda TODO para que el backend no “borre” campos ni rompa por null
-    const payload: any = {
-      idUsuario: this.userId,                 // por si el back lo necesita
-      nombre: (this.user.nombre ?? '').trim(),
-      email: (this.user.email ?? '').trim(),
-      password: pass,
-      curp: (this.user.curp ?? '').trim(),
-      telefonoCelular: (this.user.telefonoCelular ?? '').trim(),
-      fotoPerfil: url,
+    const endpoint = `${this.API_BASE}/create-user/photo-profile/${this.userId}`;
+    const body = JSON.stringify({ fotoPerfil: url });
 
-      // opcionales (solo si existen)
-      tipo: this.user.tipo ?? undefined,
-      verificado: this.user.verificado ?? undefined,
-      fechaRegistro: this.user.fechaRegistro ?? undefined,
-    };
+    // ✅ normalmente es PUT; si el back lo implementó como POST, hacemos fallback
+    try {
+      await this.fetchJson<any>(endpoint, { method: 'PUT', body });
+    } catch (e: any) {
+      const msg = String(e?.message ?? e);
+      // 405 Method Not Allowed / 403 Forbidden -> intenta POST
+      if (msg.includes('HTTP 405') || msg.includes('HTTP 403')) {
+        await this.fetchJson<any>(endpoint, { method: 'POST', body });
+      } else {
+        throw e;
+      }
+    }
 
-    // limpia undefined para no ensuciar el JSON
-    Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
-
-    await this.fetchJson(`${this.API_BASE}/update-user/${this.userId}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    });
-
-    // ✅ recarga desde BD para confirmar que quedó guardada
+    // ✅ Recarga desde BD para confirmar que sí se guardó
     await this.reloadFromDb();
+
+    const fotoDb = this.pickString(
+      (this as any).userDbRaw?.fotoPerfil,
+      (this as any).userDbRaw?.foto_perfil,
+      (this as any).userDbRaw?.photoProfile
+    );
+
+    if (!fotoDb) {
+      this.toast('El backend respondió, pero la BD sigue con fotoPerfil = null.', 'bad');
+      this.showModal(
+        'error',
+        'No se guardó',
+        'El GET /user/{id} sigue devolviendo fotoPerfil = null. Revisa el backend del endpoint photo-profile.'
+      );
+      return;
+    }
 
     this.toast('Foto guardada ✅', 'ok');
     this.showModal('success', 'Foto actualizada', 'Se actualizó tu foto de perfil.');
@@ -397,6 +402,7 @@ private readonly API_BASE = `${environment.apiUrl.replace(/\/$/, '')}/api/petcar
     this.savingPhoto = false;
   }
 }
+
 
 
   private ensurePasswordForUpdate(): string | null {
