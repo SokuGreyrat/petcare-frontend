@@ -106,13 +106,8 @@ export class Perfil implements OnInit {
   coloniaCodigo: string = '—';
 
   ngOnInit(): void {
+    // ✅ SOLO usamos la sesión general / AuthService. NO creamos userId/idUsuario en localStorage.
     this.userId = this.getLoggedUserId();
-
-    // compat: deja un userId directo para otras pantallas viejas
-    if (this.userId) {
-      localStorage.setItem('userId', String(this.userId));
-      localStorage.setItem('idUsuario', String(this.userId));
-    }
 
     if (!this.userId) {
       this.showModal('error', 'Sesión no encontrada', 'No pude detectar tu id de usuario. Vuelve a iniciar sesión.');
@@ -141,13 +136,14 @@ export class Perfil implements OnInit {
         password: (u as any).password ?? sessionPassword ?? '',
         curp: u.curp ?? '',
         telefonoCelular: u.telefonoCelular ?? '',
-        fotoPerfil: this.pickString(
-          (u as any).fotoPerfil,
-          (u as any).foto_perfil,
-          (u as any).photoProfile,
-          (u as any).photo,
-          sessionFoto,
-        ) ?? '',
+        fotoPerfil:
+          this.pickString(
+            (u as any).fotoPerfil,
+            (u as any).foto_perfil,
+            (u as any).photoProfile,
+            (u as any).photo,
+            sessionFoto,
+          ) ?? '',
         fotoPortada: (u as any).fotoPortada ?? '',
         tipo: (u as any).tipo ?? null,
         verificado: (u as any).verificado ?? null,
@@ -156,7 +152,6 @@ export class Perfil implements OnInit {
 
       this.photoUrl = (this.user as any).fotoPerfil ?? '';
 
-      // ✅ aquí está la corrección real
       await this.loadColoniaFromRelacion();
 
       this.buildSummary();
@@ -174,17 +169,13 @@ export class Perfil implements OnInit {
   private async loadColoniaFromRelacion(): Promise<void> {
     if (!this.userId) return;
 
-    // por defecto
     this.coloniaNombre = '—';
     this.coloniaCodigo = '—';
 
-    // 1) trae relaciones user-colonia
     const rels = await this.safeFetchList<UsuariosColonia>(`${this.API_BASE}/allusuarios-colonias`);
-    const mine = rels.filter(r => Number(r?.usuarioId) === Number(this.userId));
-
+    const mine = rels.filter((r) => Number(r?.usuarioId) === Number(this.userId));
     if (!mine.length) return;
 
-    // si hay varias, agarra la más reciente por fechaRegistro (si viene)
     const pick = mine
       .slice()
       .sort((a, b) => this.toTime(b.fechaRegistro) - this.toTime(a.fechaRegistro))[0];
@@ -192,7 +183,6 @@ export class Perfil implements OnInit {
     const coloniaId = Number(pick?.coloniaId);
     if (!Number.isFinite(coloniaId) || coloniaId <= 0) return;
 
-    // 2) trae la colonia
     const col = await this.safeFetchJson<Colonia>(`${this.API_BASE}/colonia/${coloniaId}`);
     if (!col) return;
 
@@ -211,8 +201,10 @@ export class Perfil implements OnInit {
     const ver = this.user.verificado === true;
     const fecha = this.formatDate(this.user.fechaRegistro);
 
+    const idMostrado = this.userId ?? (this.user as any)?.id ?? this.user.idUsuario;
+
     this.summaryRows = [
-      { label: 'ID de usuario', value: String(this.user.idUsuario || '—') },
+      { label: 'ID de usuario', value: String(idMostrado || '—') },
       { label: 'Nombre', value: this.user.nombre?.trim() || '—' },
       { label: 'Correo', value: this.user.email?.trim() || '—' },
       { label: 'Teléfono', value: (this.user.telefonoCelular ?? '').trim() || '—' },
@@ -220,11 +212,7 @@ export class Perfil implements OnInit {
       { label: 'Tipo de cuenta', value: (this.user.tipo ?? '').trim() || '—' },
       { label: 'Verificado', value: ver ? 'Sí' : 'No', tone: ver ? 'ok' : 'warn' },
       { label: 'Registro', value: fecha || '—' },
-
-      // ✅ ya sale bien
       { label: 'Colonia', value: this.coloniaNombre || '—' },
-
-      // ✅ bonus: también viene del back y se ve cool en “Datos rápidos”
       { label: 'Código invitación', value: this.coloniaCodigo || '—' },
     ];
   }
@@ -246,10 +234,10 @@ export class Perfil implements OnInit {
         this.safeFetchList<SolicitudLite>(`${this.API_BASE}/allsolicitudes-adopcion`),
       ]);
 
-      this.stats.mascotas = mascotas.filter(m => Number(m?.usuarioId) === uid).length;
-      this.stats.posts = posts.filter(p => Number(p?.usuarioId) === uid).length;
-      this.stats.adopciones = adopciones.filter(a => Number(a?.usuarioPublicadorId) === uid).length;
-      this.stats.solicitudes = solicitudes.filter(s => Number(s?.solicitanteId) === uid).length;
+      this.stats.mascotas = mascotas.filter((m) => Number(m?.usuarioId) === uid).length;
+      this.stats.posts = posts.filter((p) => Number(p?.usuarioId) === uid).length;
+      this.stats.adopciones = adopciones.filter((a) => Number(a?.usuarioPublicadorId) === uid).length;
+      this.stats.solicitudes = solicitudes.filter((s) => Number(s?.solicitanteId) === uid).length;
     } catch {
       this.stats = { mascotas: null, posts: null, adopciones: null, solicitudes: null };
     }
@@ -293,7 +281,6 @@ export class Perfil implements OnInit {
         body: JSON.stringify(payload),
       });
 
-      // normaliza respuesta (a veces viene id, fotoPerfil, etc.)
       const merged: any = { ...this.user, ...updated };
       merged.idUsuario = merged.idUsuario ?? merged.id ?? this.userId;
       merged.fotoPerfil =
@@ -312,7 +299,6 @@ export class Perfil implements OnInit {
         fotoPerfil: (this.user as any).fotoPerfil ?? '',
       });
 
-      // refresca colonia por si cambió la relación (o se unió a otra)
       await this.loadColoniaFromRelacion();
 
       this.buildSummary();
@@ -333,11 +319,28 @@ export class Perfil implements OnInit {
     const url = (this.photoUrl ?? '').trim();
     if (!url) return this.toast('Pega una URL de imagen primero.', 'bad');
 
+    // Asegura password si el backend lo exige en update-user
+    if (!this.user.password) {
+      const session = this.readSessionUser();
+      const sessionPassword = this.pickString(session?.password, (session as any)?.pass);
+      if (sessionPassword) this.user.password = sessionPassword;
+    }
+
+    if (!this.user.password) {
+      return this.toast('No tengo tu password para guardar la foto. Cierra sesión e inicia de nuevo.', 'bad');
+    }
+
     this.savingPhoto = true;
     try {
-      const updated = await this.fetchJson<Usuario>(`${this.API_BASE}/create-user/photo-profile/${this.userId}`, {
+      // ✅ En vez de create-user/photo-profile (que te daba 403), lo guardamos con update-user
+      const payload: Partial<Usuario> = {
+        password: this.user.password,
+        fotoPerfil: url,
+      };
+
+      const updated = await this.fetchJson<Usuario>(`${this.API_BASE}/update-user/${this.userId}`, {
         method: 'PUT',
-        body: JSON.stringify({ fotoPerfil: url }),
+        body: JSON.stringify(payload),
       });
 
       const foto = this.pickString(
@@ -350,7 +353,6 @@ export class Perfil implements OnInit {
       (this.user as any).fotoPerfil = foto ?? url;
       this.photoUrl = (this.user as any).fotoPerfil ?? url;
 
-      // persiste en sesión para que no “desaparezca” al cambiar de página
       this.patchSessionUser({ fotoPerfil: (this.user as any).fotoPerfil ?? url });
 
       this.buildSummary();
@@ -408,30 +410,21 @@ export class Perfil implements OnInit {
     return `${dd}/${mm}/${yyyy}`;
   }
 
+  // ✅ SOLO sesión general / auth. Sin leer userId/idUsuario “viejos”.
   private getLoggedUserId(): number | null {
-    // 1) sesión real del front
+    // 1) AuthService (si existe)
+    try {
+      const u: any = (this.auth as any)?.user?.();
+      const id = Number(u?.id ?? u?.idUsuario);
+      if (Number.isFinite(id) && id > 0) return id;
+    } catch {
+      // ignore
+    }
+
+    // 2) localStorage petcare.session.v1
     const session = this.readSessionUser();
-    const sid = Number((session as any)?.id ?? (session as any)?.idUsuario ?? (session as any)?.userId);
-    if (Number.isFinite(sid) && sid > 0) return sid;
-
-    const direct = localStorage.getItem('userId') || localStorage.getItem('idUsuario');
-    if (direct) {
-      const n = Number(direct);
-      return Number.isFinite(n) && n > 0 ? n : null;
-    }
-
-    const json = localStorage.getItem('usuario') || localStorage.getItem('user');
-    if (json) {
-      try {
-        const obj = JSON.parse(json);
-        const id = Number(obj?.idUsuario ?? obj?.id ?? obj?.userId);
-        return Number.isFinite(id) && id > 0 ? id : null;
-      } catch {
-        return null;
-      }
-    }
-
-    return null;
+    const sid = Number((session as any)?.id ?? (session as any)?.idUsuario);
+    return Number.isFinite(sid) && sid > 0 ? sid : null;
   }
 
   private readSessionUser(): any | null {
