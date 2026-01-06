@@ -4,6 +4,9 @@ import { FormsModule } from '@angular/forms';
 
 import { AuthService } from '../../services/auth.service';
 
+import { ChangeDetectorRef } from '@angular/core';
+
+
 type Usuario = {
   idUsuario: number;
   id?: number;
@@ -61,6 +64,8 @@ export class Perfil implements OnInit {
   private readonly API_BASE = '/api/petcare';
   private auth = inject(AuthService);
   private readonly LS_SESSION = 'petcare.session.v1';
+  private cdr = inject(ChangeDetectorRef);
+
 
   loading = false;
   savingProfile = false;
@@ -272,6 +277,7 @@ export class Perfil implements OnInit {
       { label: 'Colonia', value: this.coloniaNombre || '—' },
       { label: 'Código invitación', value: this.coloniaCodigo || '—' },
     ];
+    this.cdr.detectChanges();
   }
 
   // =========================
