@@ -351,39 +351,53 @@ private readonly API_BASE = `${environment.apiUrl.replace(/\/$/, '')}/api/petcar
     }
   }
 
-  async guardarFoto(): Promise<void> {
-    if (!this.userId) return;
+ async guardarFoto(): Promise<void> {
+  if (!this.userId) return;
 
-    const url = (this.photoUrl ?? '').trim();
-    if (!url) return this.toast('Pega una URL de imagen primero.', 'bad');
+  const url = (this.photoUrl ?? '').trim();
+  if (!url) return this.toast('Pega una URL de imagen primero.', 'bad');
 
-    const pass = this.ensurePasswordForUpdate();
-    if (!pass) return this.toast('No tengo tu password para guardar la foto. Cierra sesión e inicia de nuevo.', 'bad');
+  const pass = this.ensurePasswordForUpdate();
+  if (!pass) return this.toast('No tengo tu password para guardar la foto. Cierra sesión e inicia de nuevo.', 'bad');
 
-    this.savingPhoto = true;
-    try {
-      // ✅ guardamos con update-user (el otro endpoint te daba 403)
-      const payload: Partial<Usuario> = {
-        password: pass,
-        fotoPerfil: url,
-      };
+  this.savingPhoto = true;
+  try {
+    // ✅ manda TODO para que el backend no “borre” campos ni rompa por null
+    const payload: any = {
+      idUsuario: this.userId,                 // por si el back lo necesita
+      nombre: (this.user.nombre ?? '').trim(),
+      email: (this.user.email ?? '').trim(),
+      password: pass,
+      curp: (this.user.curp ?? '').trim(),
+      telefonoCelular: (this.user.telefonoCelular ?? '').trim(),
+      fotoPerfil: url,
 
-      await this.fetchJson<Usuario>(`${this.API_BASE}/update-user/${this.userId}`, {
-        method: 'PUT',
-        body: JSON.stringify(payload),
-      });
+      // opcionales (solo si existen)
+      tipo: this.user.tipo ?? undefined,
+      verificado: this.user.verificado ?? undefined,
+      fechaRegistro: this.user.fechaRegistro ?? undefined,
+    };
 
-      // ✅ recarga desde BD para validar que sí quedó guardada
-      await this.reloadFromDb();
+    // limpia undefined para no ensuciar el JSON
+    Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
 
-      this.toast('Foto guardada ✅', 'ok');
-      this.showModal('success', 'Foto actualizada', 'Se actualizó tu foto de perfil.');
-    } catch (e: any) {
-      this.showModal('error', 'No se pudo guardar la foto', this.humanError(e));
-    } finally {
-      this.savingPhoto = false;
-    }
+    await this.fetchJson(`${this.API_BASE}/update-user/${this.userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+
+    // ✅ recarga desde BD para confirmar que quedó guardada
+    await this.reloadFromDb();
+
+    this.toast('Foto guardada ✅', 'ok');
+    this.showModal('success', 'Foto actualizada', 'Se actualizó tu foto de perfil.');
+  } catch (e: any) {
+    this.showModal('error', 'No se pudo guardar la foto', this.humanError(e));
+  } finally {
+    this.savingPhoto = false;
   }
+}
+
 
   private ensurePasswordForUpdate(): string | null {
     // si ya lo tienes en memoria
