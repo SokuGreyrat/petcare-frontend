@@ -5,9 +5,9 @@ import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 
 type Usuario = {
-  // el backend a veces manda idUsuario o id
   idUsuario: number;
   id?: number;
+
   nombre: string;
   email: string;
   password: string;
@@ -27,7 +27,7 @@ type UsuariosColonia = {
   id: number;
   usuarioId: number;
   coloniaId: number;
-  fechaRegistro?: string; // a veces puede venir como ISO
+  fechaRegistro?: string;
 };
 
 type Colonia = {
@@ -58,9 +58,7 @@ type SolicitudLite = { solicitanteId?: number | string | null; estado?: string |
   styleUrl: './perfil.css',
 })
 export class Perfil implements OnInit {
-  // Si NO usas proxy, cambia a: 'http://localhost:8080/api/petcare'
   private readonly API_BASE = '/api/petcare';
-
   private auth = inject(AuthService);
   private readonly LS_SESSION = 'petcare.session.v1';
 
@@ -78,6 +76,7 @@ export class Perfil implements OnInit {
 
   userId: number | null = null;
 
+  // ✅ lo que se muestra/edita en el form
   user: Usuario = {
     idUsuario: 0,
     nombre: '',
@@ -88,12 +87,13 @@ export class Perfil implements OnInit {
     fotoPerfil: '',
   };
 
+  // ✅ RAW desde BD (lo usamos para el resumen)
+  private userDbRaw: any | null = null;
+
   photoUrl = '';
 
-  // Resumen: datos del usuario
   summaryRows: SummaryRow[] = [];
 
-  // Resumen: recuadros
   stats: { mascotas: number | null; posts: number | null; adopciones: number | null; solicitudes: number | null } = {
     mascotas: null,
     posts: null,
@@ -101,12 +101,10 @@ export class Perfil implements OnInit {
     solicitudes: null,
   };
 
-  // ✅ colonia real (sale de usuarios_colonias + colonias)
   coloniaNombre: string = '—';
   coloniaCodigo: string = '—';
 
   ngOnInit(): void {
-    // ✅ SOLO usamos la sesión general / AuthService. NO creamos userId/idUsuario en localStorage.
     this.userId = this.getLoggedUserId();
 
     if (!this.userId) {
@@ -114,47 +112,34 @@ export class Perfil implements OnInit {
       return;
     }
 
-    this.loadUser();
+    this.reloadFromDb();
   }
 
-  async loadUser(): Promise<void> {
+  // =====================================================
+  // ✅ Cargar TODO desde BD
+  // =====================================================
+  async reloadFromDb(): Promise<void> {
     if (!this.userId) return;
 
     this.loading = true;
     try {
-      const session = this.readSessionUser();
-      const sessionPassword = this.pickString(session?.password, (session as any)?.pass);
-      const sessionFoto = this.pickString(session?.fotoPerfil, (session as any)?.foto_perfil, (session as any)?.photo);
+      // 1) Usuario desde BD
+      const raw = await this.fetchJson<any>(`${this.API_BASE}/user/${this.userId}`);
+      this.userDbRaw = raw;
 
-      const u = await this.fetchJson<Usuario>(`${this.API_BASE}/user/${this.userId}`);
+      // 2) Normaliza para el form (sin inventar datos)
+      this.user = this.normalizeUserFromDb(raw);
 
-      this.user = {
-        idUsuario: (u as any).idUsuario ?? (u as any).id ?? this.userId,
-        nombre: u.nombre ?? '',
-        email: u.email ?? '',
-        // muchos backends NO regresan password por seguridad → lo conservamos de sesión
-        password: (u as any).password ?? sessionPassword ?? '',
-        curp: u.curp ?? '',
-        telefonoCelular: u.telefonoCelular ?? '',
-        fotoPerfil:
-          this.pickString(
-            (u as any).fotoPerfil,
-            (u as any).foto_perfil,
-            (u as any).photoProfile,
-            (u as any).photo,
-            sessionFoto,
-          ) ?? '',
-        fotoPortada: (u as any).fotoPortada ?? '',
-        tipo: (u as any).tipo ?? null,
-        verificado: (u as any).verificado ?? null,
-        fechaRegistro: (u as any).fechaRegistro ?? null,
-      };
+      // 3) Foto en input (solo BD)
+      this.photoUrl = (this.user.fotoPerfil ?? '').trim();
 
-      this.photoUrl = (this.user as any).fotoPerfil ?? '';
-
+      // 4) Colonia desde BD
       await this.loadColoniaFromRelacion();
 
-      this.buildSummary();
+      // 5) Resumen (solo BD)
+      this.buildSummaryFromDb();
+
+      // 6) Conteos
       await this.loadCounts();
     } catch (e: any) {
       this.showModal('error', 'Error cargando perfil', this.humanError(e));
@@ -163,8 +148,57 @@ export class Perfil implements OnInit {
     }
   }
 
+  private normalizeUserFromDb(raw: any): Usuario {
+    const idUsuario = Number(raw?.idUsuario ?? raw?.id ?? this.userId ?? 0);
+
+    const nombre = this.pickString(raw?.nombre, raw?.name) ?? '';
+    const email = this.pickString(raw?.email, raw?.correo) ?? '';
+
+    // ⚠️ password normalmente NO viene desde BD por seguridad → lo dejamos vacío en UI
+    // pero lo tomaremos de sesión SOLO al momento de hacer PUT (guardarCambios/guardarFoto)
+    const password = this.pickString(raw?.password) ?? '';
+
+    const curp = this.pickString(raw?.curp) ?? '';
+    const tel = this.pickString(raw?.telefonoCelular, raw?.telefono_celular, raw?.telefono, raw?.celular) ?? '';
+
+    const fotoPerfil =
+      this.pickString(raw?.fotoPerfil, raw?.foto_perfil, raw?.photoProfile, raw?.photo) ?? '';
+
+    const fotoPortada =
+      this.pickString(raw?.fotoPortada, raw?.foto_portada, raw?.cover) ?? '';
+
+    const tipo = this.pickString(raw?.tipo, raw?.rol, raw?.role) ?? null;
+
+    const verificado =
+      typeof raw?.verificado === 'boolean'
+        ? raw.verificado
+        : raw?.verificado === 1 || raw?.verificado === '1'
+          ? true
+          : raw?.verificado === 0 || raw?.verificado === '0'
+            ? false
+            : null;
+
+    const fechaRegistro =
+      this.pickString(raw?.fechaRegistro, raw?.fecha_registro, raw?.createdAt, raw?.created_at) ?? null;
+
+    return {
+      idUsuario: Number.isFinite(idUsuario) ? idUsuario : 0,
+      id: raw?.id,
+      nombre,
+      email,
+      password,
+      curp,
+      telefonoCelular: tel,
+      fotoPerfil,
+      fotoPortada,
+      tipo,
+      verificado,
+      fechaRegistro,
+    };
+  }
+
   // =========================
-  // ✅ Colonia: usuarios_colonias -> colonia/{id}
+  // ✅ Colonia (BD)
   // =========================
   private async loadColoniaFromRelacion(): Promise<void> {
     if (!this.userId) return;
@@ -197,20 +231,40 @@ export class Perfil implements OnInit {
     return Number.isFinite(t) ? t : 0;
   }
 
-  private buildSummary(): void {
-    const ver = this.user.verificado === true;
-    const fecha = this.formatDate(this.user.fechaRegistro);
+  // =========================
+  // ✅ Resumen SOLO con BD
+  // =========================
+  private buildSummaryFromDb(): void {
+    const raw = this.userDbRaw ?? {};
+    const idMostrado = Number(raw?.idUsuario ?? raw?.id ?? this.userId ?? 0) || 0;
 
-    const idMostrado = this.userId ?? (this.user as any)?.id ?? this.user.idUsuario;
+    const nombre = this.pickString(raw?.nombre, raw?.name) ?? '';
+    const email = this.pickString(raw?.email, raw?.correo) ?? '';
+
+    const tel =
+      this.pickString(raw?.telefonoCelular, raw?.telefono_celular, raw?.telefono, raw?.celular) ?? '';
+
+    const curp = this.pickString(raw?.curp) ?? '';
+    const tipo = this.pickString(raw?.tipo, raw?.rol, raw?.role) ?? '';
+
+    const verificado =
+      typeof raw?.verificado === 'boolean'
+        ? raw.verificado
+        : raw?.verificado === 1 || raw?.verificado === '1'
+          ? true
+          : false;
+
+    const fechaRegistro = this.pickString(raw?.fechaRegistro, raw?.fecha_registro, raw?.createdAt, raw?.created_at);
+    const fecha = this.formatDate(fechaRegistro ?? null);
 
     this.summaryRows = [
-      { label: 'ID de usuario', value: String(idMostrado || '—') },
-      { label: 'Nombre', value: this.user.nombre?.trim() || '—' },
-      { label: 'Correo', value: this.user.email?.trim() || '—' },
-      { label: 'Teléfono', value: (this.user.telefonoCelular ?? '').trim() || '—' },
-      { label: 'CURP', value: (this.user.curp ?? '').trim() || '—' },
-      { label: 'Tipo de cuenta', value: (this.user.tipo ?? '').trim() || '—' },
-      { label: 'Verificado', value: ver ? 'Sí' : 'No', tone: ver ? 'ok' : 'warn' },
+      { label: 'ID de usuario', value: idMostrado ? String(idMostrado) : '—' },
+      { label: 'Nombre', value: nombre.trim() || '—' },
+      { label: 'Correo', value: email.trim() || '—' },
+      { label: 'Teléfono', value: tel.trim() || '—' },
+      { label: 'CURP', value: curp.trim() || '—' },
+      { label: 'Tipo de cuenta', value: tipo.trim() || '—' },
+      { label: 'Verificado', value: verificado ? 'Sí' : 'No', tone: verificado ? 'ok' : 'warn' },
       { label: 'Registro', value: fecha || '—' },
       { label: 'Colonia', value: this.coloniaNombre || '—' },
       { label: 'Código invitación', value: this.coloniaCodigo || '—' },
@@ -255,54 +309,27 @@ export class Perfil implements OnInit {
     if (!nombre) return this.toast('Pon tu nombre para guardar.', 'bad');
     if (!email || !email.includes('@')) return this.toast('Tu correo se ve raro. Revísalo.', 'bad');
 
-    // el back puede no regresar password; lo tomamos de sesión si falta
-    if (!this.user.password) {
-      const session = this.readSessionUser();
-      const sessionPassword = this.pickString(session?.password, (session as any)?.pass);
-      if (sessionPassword) this.user.password = sessionPassword;
-    }
-
-    if (!this.user.password) {
-      return this.toast('No tengo tu password para guardar cambios. Cierra sesión e inicia de nuevo.', 'bad');
-    }
+    // ✅ password solo para el PUT (si el backend lo exige)
+    const pass = this.ensurePasswordForUpdate();
+    if (!pass) return this.toast('No tengo tu password para guardar cambios. Cierra sesión e inicia de nuevo.', 'bad');
 
     this.savingProfile = true;
     try {
       const payload: Partial<Usuario> = {
         nombre,
         email,
-        password: this.user.password,
+        password: pass,
         curp: (this.user.curp ?? '').trim(),
         telefonoCelular: (this.user.telefonoCelular ?? '').trim(),
       };
 
-      const updated = await this.fetchJson<Usuario>(`${this.API_BASE}/update-user/${this.userId}`, {
+      await this.fetchJson<Usuario>(`${this.API_BASE}/update-user/${this.userId}`, {
         method: 'PUT',
         body: JSON.stringify(payload),
       });
 
-      const merged: any = { ...this.user, ...updated };
-      merged.idUsuario = merged.idUsuario ?? merged.id ?? this.userId;
-      merged.fotoPerfil =
-        this.pickString(merged.fotoPerfil, merged.foto_perfil, (updated as any)?.fotoPerfil) ?? this.user.fotoPerfil;
-      merged.password = this.user.password; // no sobreescribimos con vacío
-
-      this.user = merged as Usuario;
-
-      this.patchSessionUser({
-        id: (this.user as any).id ?? this.user.idUsuario,
-        nombre: this.user.nombre,
-        email: this.user.email,
-        password: this.user.password,
-        curp: this.user.curp ?? '',
-        telefonoCelular: this.user.telefonoCelular ?? '',
-        fotoPerfil: (this.user as any).fotoPerfil ?? '',
-      });
-
-      await this.loadColoniaFromRelacion();
-
-      this.buildSummary();
-      await this.loadCounts();
+      // ✅ importante: recarga desde BD para que el resumen sea 100% real
+      await this.reloadFromDb();
 
       this.toast('Cambios guardados ✨', 'ok');
       this.showModal('success', 'Listo', 'Tu información se actualizó correctamente.');
@@ -319,44 +346,24 @@ export class Perfil implements OnInit {
     const url = (this.photoUrl ?? '').trim();
     if (!url) return this.toast('Pega una URL de imagen primero.', 'bad');
 
-    // Asegura password si el backend lo exige en update-user
-    if (!this.user.password) {
-      const session = this.readSessionUser();
-      const sessionPassword = this.pickString(session?.password, (session as any)?.pass);
-      if (sessionPassword) this.user.password = sessionPassword;
-    }
-
-    if (!this.user.password) {
-      return this.toast('No tengo tu password para guardar la foto. Cierra sesión e inicia de nuevo.', 'bad');
-    }
+    const pass = this.ensurePasswordForUpdate();
+    if (!pass) return this.toast('No tengo tu password para guardar la foto. Cierra sesión e inicia de nuevo.', 'bad');
 
     this.savingPhoto = true;
     try {
-      // ✅ En vez de create-user/photo-profile (que te daba 403), lo guardamos con update-user
+      // ✅ guardamos con update-user (el otro endpoint te daba 403)
       const payload: Partial<Usuario> = {
-        password: this.user.password,
+        password: pass,
         fotoPerfil: url,
       };
 
-      const updated = await this.fetchJson<Usuario>(`${this.API_BASE}/update-user/${this.userId}`, {
+      await this.fetchJson<Usuario>(`${this.API_BASE}/update-user/${this.userId}`, {
         method: 'PUT',
         body: JSON.stringify(payload),
       });
 
-      const foto = this.pickString(
-        (updated as any)?.fotoPerfil,
-        (updated as any)?.foto_perfil,
-        (updated as any)?.photoProfile,
-        url,
-      );
-
-      (this.user as any).fotoPerfil = foto ?? url;
-      this.photoUrl = (this.user as any).fotoPerfil ?? url;
-
-      this.patchSessionUser({ fotoPerfil: (this.user as any).fotoPerfil ?? url });
-
-      this.buildSummary();
-      await this.loadCounts();
+      // ✅ recarga desde BD para validar que sí quedó guardada
+      await this.reloadFromDb();
 
       this.toast('Foto guardada ✅', 'ok');
       this.showModal('success', 'Foto actualizada', 'Se actualizó tu foto de perfil.');
@@ -365,6 +372,18 @@ export class Perfil implements OnInit {
     } finally {
       this.savingPhoto = false;
     }
+  }
+
+  private ensurePasswordForUpdate(): string | null {
+    // si ya lo tienes en memoria
+    if (this.user?.password?.trim()) return this.user.password.trim();
+
+    // si no, lo tomamos de sesión (solo para PUT)
+    const session = this.readSessionUser();
+    const sessionPassword = this.pickString(session?.password, (session as any)?.pass);
+    if (sessionPassword) return sessionPassword;
+
+    return null;
   }
 
   // =========================
@@ -410,9 +429,9 @@ export class Perfil implements OnInit {
     return `${dd}/${mm}/${yyyy}`;
   }
 
-  // ✅ SOLO sesión general / auth. Sin leer userId/idUsuario “viejos”.
+  // ✅ SOLO sesión real / AuthService
   private getLoggedUserId(): number | null {
-    // 1) AuthService (si existe)
+    // 1) AuthService
     try {
       const u: any = (this.auth as any)?.user?.();
       const id = Number(u?.id ?? u?.idUsuario);
@@ -435,23 +454,6 @@ export class Perfil implements OnInit {
       return parsed && typeof parsed === 'object' ? parsed : null;
     } catch {
       return null;
-    }
-  }
-
-  private patchSessionUser(patch: Record<string, any>): void {
-    try {
-      const current = this.readSessionUser();
-      if (!current) return;
-      const next = { ...current, ...patch };
-      localStorage.setItem(this.LS_SESSION, JSON.stringify(next));
-
-      // también actualiza el AuthService para que todo el app vea el cambio
-      const id = Number(next?.id ?? next?.idUsuario);
-      if (Number.isFinite(id) && id > 0) {
-        this.auth.setUser(next);
-      }
-    } catch {
-      // ignore
     }
   }
 
@@ -484,11 +486,22 @@ export class Perfil implements OnInit {
     }
   }
 
+  private withTs(url: string): string {
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}_ts=${Date.now()}`;
+  }
+
   private async fetchJson<T>(url: string, options: RequestInit = {}): Promise<T> {
-    const res = await fetch(url, {
+    const method = (options.method ?? 'GET').toUpperCase();
+
+    const finalUrl = method === 'GET' ? this.withTs(url) : url;
+
+    const res = await fetch(finalUrl, {
       ...options,
+      cache: method === 'GET' ? 'no-store' : options.cache,
       headers: {
         'Content-Type': 'application/json',
+        ...(method === 'GET' ? { 'Cache-Control': 'no-store' } : {}),
         ...(options.headers ?? {}),
       },
     });
