@@ -1,9 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, HostListener, OnInit } from '@angular/core';
+import { Component, HostListener, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { AuthService } from '../../services/auth.service';
+
 type Usuario = {
+  // el backend a veces manda idUsuario o id
   idUsuario: number;
+  id?: number;
   nombre: string;
   email: string;
   password: string;
@@ -54,8 +58,11 @@ type SolicitudLite = { solicitanteId?: number | string | null; estado?: string |
   styleUrl: './perfil.css',
 })
 export class Perfil implements OnInit {
-  // Si NO usas proxy, cambia a: 'http://localhost:8080/api/petcare'
+  // SIN proxy, cambiar a: 'http://localhost:8080/api/petcare'
   private readonly API_BASE = '/api/petcare';
+
+  private auth = inject(AuthService);
+  private readonly LS_SESSION = 'petcare.session.v1';
 
   loading = false;
   savingProfile = false;
@@ -94,12 +101,18 @@ export class Perfil implements OnInit {
     solicitudes: null,
   };
 
-  // ✅ colonia real (sale de usuarios_colonias + colonias)
+  // colonia real (sale de usuarios_colonias + colonias)
   coloniaNombre: string = '—';
   coloniaCodigo: string = '—';
 
   ngOnInit(): void {
     this.userId = this.getLoggedUserId();
+
+    // compat: deja un userId directo para otras pantallas viejas
+    if (this.userId) {
+      localStorage.setItem('userId', String(this.userId));
+      localStorage.setItem('idUsuario', String(this.userId));
+    }
 
     if (!this.userId) {
       this.showModal('error', 'Sesión no encontrada', 'No pude detectar tu id de usuario. Vuelve a iniciar sesión.');
@@ -114,16 +127,26 @@ export class Perfil implements OnInit {
 
     this.loading = true;
     try {
+      const session = this.readSessionUser();
+      const sessionPassword = this.pickString(session?.password, (session as any)?.pass);
+      const sessionFoto = this.pickString(session?.fotoPerfil, (session as any)?.foto_perfil, (session as any)?.photo);
+
       const u = await this.fetchJson<Usuario>(`${this.API_BASE}/user/${this.userId}`);
 
       this.user = {
-        idUsuario: u.idUsuario,
+        idUsuario: (u as any).idUsuario ?? (u as any).id ?? this.userId,
         nombre: u.nombre ?? '',
         email: u.email ?? '',
-        password: u.password ?? '',
+        password: (u as any).password ?? sessionPassword ?? '',
         curp: u.curp ?? '',
         telefonoCelular: u.telefonoCelular ?? '',
-        fotoPerfil: (u as any).fotoPerfil ?? '',
+        fotoPerfil: this.pickString(
+          (u as any).fotoPerfil,
+          (u as any).foto_perfil,
+          (u as any).photoProfile,
+          (u as any).photo,
+          sessionFoto,
+        ) ?? '',
         fotoPortada: (u as any).fotoPortada ?? '',
         tipo: (u as any).tipo ?? null,
         verificado: (u as any).verificado ?? null,
@@ -132,7 +155,7 @@ export class Perfil implements OnInit {
 
       this.photoUrl = (this.user as any).fotoPerfil ?? '';
 
-      // ✅ aquí está la corrección real
+      
       await this.loadColoniaFromRelacion();
 
       this.buildSummary();
@@ -144,23 +167,17 @@ export class Perfil implements OnInit {
     }
   }
 
-  // =========================
-  // ✅ Colonia: usuarios_colonias -> colonia/{id}
-  // =========================
   private async loadColoniaFromRelacion(): Promise<void> {
     if (!this.userId) return;
 
-    // por defecto
     this.coloniaNombre = '—';
     this.coloniaCodigo = '—';
 
-    // 1) trae relaciones user-colonia
     const rels = await this.safeFetchList<UsuariosColonia>(`${this.API_BASE}/allusuarios-colonias`);
     const mine = rels.filter(r => Number(r?.usuarioId) === Number(this.userId));
 
     if (!mine.length) return;
 
-    // si hay varias, agarra la más reciente por fechaRegistro (si viene)
     const pick = mine
       .slice()
       .sort((a, b) => this.toTime(b.fechaRegistro) - this.toTime(a.fechaRegistro))[0];
@@ -168,7 +185,6 @@ export class Perfil implements OnInit {
     const coloniaId = Number(pick?.coloniaId);
     if (!Number.isFinite(coloniaId) || coloniaId <= 0) return;
 
-    // 2) trae la colonia
     const col = await this.safeFetchJson<Colonia>(`${this.API_BASE}/colonia/${coloniaId}`);
     if (!col) return;
 
@@ -197,17 +213,13 @@ export class Perfil implements OnInit {
       { label: 'Verificado', value: ver ? 'Sí' : 'No', tone: ver ? 'ok' : 'warn' },
       { label: 'Registro', value: fecha || '—' },
 
-      // ✅ ya sale bien
       { label: 'Colonia', value: this.coloniaNombre || '—' },
 
-      // ✅ bonus: también viene del back y se ve cool en “Datos rápidos”
       { label: 'Código invitación', value: this.coloniaCodigo || '—' },
     ];
   }
 
-  // =========================
-  // Conteos recuadros
-  // =========================
+  
   private async loadCounts(): Promise<void> {
     if (!this.userId) return;
     const uid = Number(this.userId);
@@ -231,9 +243,7 @@ export class Perfil implements OnInit {
     }
   }
 
-  // =========================
-  // Acciones
-  // =========================
+  
   async guardarCambios(): Promise<void> {
     if (!this.userId) return;
 
@@ -243,8 +253,15 @@ export class Perfil implements OnInit {
     if (!nombre) return this.toast('Pon tu nombre para guardar.', 'bad');
     if (!email || !email.includes('@')) return this.toast('Tu correo se ve raro. Revísalo.', 'bad');
 
+    // el back puede no regresar password; lo tomamos de sesión si falta
     if (!this.user.password) {
-      return this.toast('No pude conservar tu password (viene vacío). Dale “Recargar”.', 'bad');
+      const session = this.readSessionUser();
+      const sessionPassword = this.pickString(session?.password, (session as any)?.pass);
+      if (sessionPassword) this.user.password = sessionPassword;
+    }
+
+    if (!this.user.password) {
+      return this.toast('No tengo tu password para guardar cambios. Cierra sesión e inicia de nuevo.', 'bad');
     }
 
     this.savingProfile = true;
@@ -262,9 +279,25 @@ export class Perfil implements OnInit {
         body: JSON.stringify(payload),
       });
 
-      this.user = { ...this.user, ...updated };
+      const merged: any = { ...this.user, ...updated };
+      merged.idUsuario = merged.idUsuario ?? merged.id ?? this.userId;
+      merged.fotoPerfil =
+        this.pickString(merged.fotoPerfil, merged.foto_perfil, (updated as any)?.fotoPerfil) ?? this.user.fotoPerfil;
+      merged.password = this.user.password; // no sobreescribimos con vacío
 
-      // refresca colonia por si cambió la relación (o se unió a otra)
+      this.user = merged as Usuario;
+
+      this.patchSessionUser({
+        id: (this.user as any).id ?? this.user.idUsuario,
+        nombre: this.user.nombre,
+        email: this.user.email,
+        password: this.user.password,
+        curp: this.user.curp ?? '',
+        telefonoCelular: this.user.telefonoCelular ?? '',
+        fotoPerfil: (this.user as any).fotoPerfil ?? '',
+      });
+
+      // refresca colonia 
       await this.loadColoniaFromRelacion();
 
       this.buildSummary();
@@ -280,36 +313,51 @@ export class Perfil implements OnInit {
   }
 
   async guardarFoto(): Promise<void> {
-    if (!this.userId) return;
+  if (!this.userId) return;
 
-    const url = (this.photoUrl ?? '').trim();
-    if (!url) return this.toast('Pega una URL de imagen primero.', 'bad');
+  const url = (this.photoUrl ?? '').trim();
+  if (!url) return this.toast('Pega una URL de imagen primero.', 'bad');
 
-    this.savingPhoto = true;
-    try {
-      const updated = await this.fetchJson<Usuario>(`${this.API_BASE}/create-user/photo-profile/${this.userId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ fotoPerfil: url }),
-      });
-
-      (this.user as any).fotoPerfil = (updated as any).fotoPerfil ?? url;
-      this.photoUrl = (this.user as any).fotoPerfil ?? url;
-
-      this.buildSummary();
-      await this.loadCounts();
-
-      this.toast('Foto guardada ✅', 'ok');
-      this.showModal('success', 'Foto actualizada', 'Se actualizó tu foto de perfil.');
-    } catch (e: any) {
-      this.showModal('error', 'No se pudo guardar la foto', this.humanError(e));
-    } finally {
-      this.savingPhoto = false;
-    }
+  // el backend pide password para actualizar usuario
+  if (!this.user?.password) {
+    return this.toast('No tengo tu password para guardar la foto. Cierra sesión e inicia de nuevo.', 'bad');
   }
 
-  // =========================
-  // UI helpers
-  // =========================
+  this.savingPhoto = true;
+  try {
+    // actualiza el usuario completo usando el endpoint que normalmente sí está permitido
+    const body = {
+      ...this.user,
+      fotoPerfil: url,
+      password: this.user.password,
+    };
+
+    const updated = await this.fetchJson<any>(`${this.API_BASE}/update-user/${this.userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+
+    const foto = this.pickString(updated?.fotoPerfil, updated?.foto_perfil, updated?.photoProfile, url);
+
+    (this.user as any).fotoPerfil = foto ?? url;
+    this.photoUrl = (this.user as any).fotoPerfil ?? url;
+
+    // persiste para que no “desaparezca”
+    this.patchSessionUser({ fotoPerfil: (this.user as any).fotoPerfil ?? url });
+
+    this.buildSummary();
+    await this.loadCounts();
+
+    this.toast('Foto guardada ✅', 'ok');
+    this.showModal('success', 'Foto actualizada', 'Se actualizó tu foto de perfil.');
+  } catch (e: any) {
+    this.showModal('error', 'No se pudo guardar la foto', this.humanError(e));
+  } finally {
+    this.savingPhoto = false;
+  }
+}
+
+
   toast(msg: string, type: 'ok' | 'bad' = 'ok'): void {
     this.toastMsg = msg;
     this.toastType = type;
@@ -351,6 +399,11 @@ export class Perfil implements OnInit {
   }
 
   private getLoggedUserId(): number | null {
+    // 1) sesión real del front
+    const session = this.readSessionUser();
+    const sid = Number((session as any)?.id ?? (session as any)?.idUsuario ?? (session as any)?.userId);
+    if (Number.isFinite(sid) && sid > 0) return sid;
+
     const direct = localStorage.getItem('userId') || localStorage.getItem('idUsuario');
     if (direct) {
       const n = Number(direct);
@@ -368,6 +421,43 @@ export class Perfil implements OnInit {
       }
     }
 
+    return null;
+  }
+
+  private readSessionUser(): any | null {
+    try {
+      const raw = localStorage.getItem(this.LS_SESSION);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private patchSessionUser(patch: Record<string, any>): void {
+    try {
+      const current = this.readSessionUser();
+      if (!current) return;
+      const next = { ...current, ...patch };
+      localStorage.setItem(this.LS_SESSION, JSON.stringify(next));
+
+      // también actualiza el AuthService para que todo el app vea el cambio
+      const id = Number(next?.id ?? next?.idUsuario);
+      if (Number.isFinite(id) && id > 0) {
+        this.auth.setUser(next);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  private pickString(...vals: any[]): string | null {
+    for (const v of vals) {
+      if (v === undefined || v === null) continue;
+      const s = String(v).trim();
+      if (s) return s;
+    }
     return null;
   }
 

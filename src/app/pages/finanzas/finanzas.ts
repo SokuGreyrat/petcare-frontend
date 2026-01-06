@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { catchError, of } from 'rxjs';
 
+import { AuthService } from '../../services/auth.service';
+
 type MascotaUI = {
   idMascota: number;
   nombre: string;
@@ -43,6 +45,9 @@ type GastoUI = {
 })
 export class Finanzas implements OnInit {
   private http = inject(HttpClient);
+  private auth = inject(AuthService);
+
+  private readonly LS_SESSION = 'petcare.session.v1';
 
   // UI
   toastVisible = false;
@@ -100,6 +105,13 @@ export class Finanzas implements OnInit {
     const a = new Date().getFullYear();
     this.anios = [a - 1, a, a + 1];
 
+    // compat para pantallas viejas que leen idUsuario/userId
+    const uid = this.getUserIdOrNull();
+    if (uid) {
+      localStorage.setItem('idUsuario', String(uid));
+      localStorage.setItem('userId', String(uid));
+    }
+
     this.cargarMascotasDelUsuario();
   }
 
@@ -141,12 +153,35 @@ export class Finanzas implements OnInit {
   }
 
   private getUserIdOrNull(): number | null {
+    // 1) AuthService (sesión real)
+    try {
+      const u = this.auth.user();
+      const id = Number((u as any)?.id ?? (u as any)?.idUsuario ?? (u as any)?.userId);
+      if (Number.isFinite(id) && id > 0) return id;
+    } catch {
+      // ignore
+    }
+
+    // 2) localStorage directo
     const directKeys = ['idUsuario', 'userId', 'id_user', 'usuarioId'];
     for (const k of directKeys) {
       const v = localStorage.getItem(k);
       if (v && !isNaN(Number(v))) return Number(v);
     }
 
+    // 3) sesión guardada (petcare.session.v1)
+    const sessionRaw = localStorage.getItem(this.LS_SESSION);
+    if (sessionRaw) {
+      try {
+        const s = JSON.parse(sessionRaw);
+        const id = Number(s?.id ?? s?.idUsuario ?? s?.userId);
+        if (Number.isFinite(id) && id > 0) return id;
+      } catch {
+        // ignore
+      }
+    }
+
+    // 4) otras llaves históricas
     const objKeys = ['user', 'usuario', 'currentUser', 'authUser'];
     for (const k of objKeys) {
       const raw = localStorage.getItem(k);
@@ -155,9 +190,48 @@ export class Finanzas implements OnInit {
         const o = JSON.parse(raw);
         const id = o?.idUsuario ?? o?.userId ?? o?.id ?? o?.id_user;
         if (id && !isNaN(Number(id))) return Number(id);
-      } catch {}
+      } catch {
+        // ignore
+      }
     }
     return null;
+  }
+
+  private mesMatches(rawMes: any, mesNombre: string, mesNum: number, anio: number): boolean {
+    const v = String(rawMes ?? '').trim();
+    if (!v) return false;
+
+    const vv = v.toLowerCase();
+    const targetName = mesNombre.toLowerCase();
+    if (vv === targetName) return true;
+
+    // "Enero 2026" / "enero-2026" etc
+    if (vv.includes(targetName) && vv.includes(String(anio))) return true;
+
+    // "YYYY-MM" o "YYYY-M"
+    const m1 = vv.match(/^(\d{4})[-/](\d{1,2})$/);
+    if (m1) return Number(m1[1]) === anio && Number(m1[2]) === mesNum;
+
+    // "MM" o "M"
+    if (/^\d{1,2}$/.test(vv)) return Number(vv) === mesNum;
+
+    // "YYYY-MM-..." (por si viene raro)
+    const m2 = vv.match(/^(\d{4})[-/](\d{2})/);
+    if (m2) return Number(m2[1]) === anio && Number(m2[2]) === mesNum;
+
+    return false;
+  }
+
+  private getGastoMascotaId(g: any): number | null {
+    const v = g?.mascotaId ?? g?.idMascota ?? g?.petId ?? g?.mascota_id;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
+  private getGastoUsuarioId(g: any): number | null {
+    const v = g?.usuarioId ?? g?.idUsuario ?? g?.userId ?? g?.usuario_id;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
   }
 
   nombreMes(mes: number): string {
@@ -240,12 +314,18 @@ export class Finanzas implements OnInit {
       .get<Presupuesto[]>('/api/petcare/allpresupuestos', { headers: this.authHeaders() })
       .pipe(catchError(() => of([] as Presupuesto[])))
       .subscribe((pres) => {
-        const p = (pres ?? []).find(
-          (x) => Number(x.usuarioId) === Number(usuarioId) && String(x.mes) === mesNombre
-        );
+        const pAny = (pres ?? []).find((x: any) => {
+          const uid = Number(x?.usuarioId ?? x?.idUsuario ?? x?.userId ?? x?.usuario_id);
+          if (!Number.isFinite(uid) || uid <= 0) return false;
+          if (Number(uid) !== Number(usuarioId)) return false;
+          return this.mesMatches(x?.mes, mesNombre, mesNum, anio);
+        }) as any;
 
-        this.presupuestoMonto = p?.monto ?? null;
-        this.presupuestoId = p?.id ?? null;
+        const montoN = pAny ? Number(pAny?.monto ?? pAny?.cantidad ?? pAny?.presupuesto) : NaN;
+        this.presupuestoMonto = Number.isFinite(montoN) ? montoN : null;
+
+        const pid = pAny ? Number(pAny?.id ?? pAny?.idPresupuesto ?? pAny?.presupuestoId) : NaN;
+        this.presupuestoId = Number.isFinite(pid) && pid > 0 ? pid : null;
 
         // gastos por usuario + mes/año (por fecha) + mascotaId
         this.http
@@ -253,26 +333,32 @@ export class Finanzas implements OnInit {
           .pipe(catchError(() => of([] as Gasto[])))
           .subscribe((gas) => {
             const filtrados = (gas ?? []).filter((g) => {
-              if (Number(g.usuarioId) !== Number(usuarioId)) return false;
-              if (mascotaId && Number(g.mascotaId) !== mascotaId) return false;
+              const uid = this.getGastoUsuarioId(g);
+              if (!uid || Number(uid) !== Number(usuarioId)) return false;
 
-              const d = this.toDate(g.fecha);
+              const mid = this.getGastoMascotaId(g);
+              if (mascotaId && (!mid || Number(mid) !== mascotaId)) return false;
+
+              const d = this.toDate((g as any)?.fecha ?? (g as any)?.fechaGasto ?? (g as any)?.createdAt);
               if (!d) return false;
 
               return d.getMonth() + 1 === mesNum && d.getFullYear() === anio;
             });
 
             filtrados.sort((a, b) => {
-              const da = this.toDate(a.fecha)?.getTime() ?? 0;
-              const db = this.toDate(b.fecha)?.getTime() ?? 0;
+              const da =
+                this.toDate((a as any)?.fecha ?? (a as any)?.fechaGasto ?? (a as any)?.createdAt)?.getTime() ?? 0;
+              const db =
+                this.toDate((b as any)?.fecha ?? (b as any)?.fechaGasto ?? (b as any)?.createdAt)?.getTime() ?? 0;
               return db - da;
             });
 
             this.gastos = filtrados.map((g) => ({
-              idGasto: Number(g.id),
-              categoria: String(g.categoria),
-              monto: Number(g.monto),
-              descripcion: g.proveedor ? String(g.proveedor) : '',
+              idGasto: Number((g as any)?.id ?? (g as any)?.idGasto ?? (g as any)?.gastoId),
+              categoria: String((g as any)?.categoria ?? (g as any)?.tipo ?? 'Gasto'),
+              monto: Number((g as any)?.monto ?? (g as any)?.cantidad ?? 0),
+              // en este front usamos "proveedor" como descripción
+              descripcion: String((g as any)?.proveedor ?? (g as any)?.descripcion ?? ''),
             }));
 
             this.recalcular();

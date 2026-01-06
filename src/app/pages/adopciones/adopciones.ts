@@ -2,9 +2,8 @@ import { CommonModule } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { environment } from  '../../../environments/environment';
 
-type Vista = 'explorar' | 'misPublicaciones' | 'misSolicitudes';
+type Vista = 'explorar' | 'misPublicaciones' | 'misSolicitudes' | 'solicitudesRecibidas';
 
 interface Adopcion {
   id: number;
@@ -74,7 +73,7 @@ interface ImagenMascota {
   styleUrls: ['./adopciones.css']
 })
 export class AdopcionesComponent implements OnInit {
-  private readonly API = `${environment.apiUrl}/api/petcare`;
+  private readonly API = '/api/petcare';
 
   // Placeholder para cuando no haya foto
   private readonly IMG_PLACEHOLDER =
@@ -102,7 +101,11 @@ export class AdopcionesComponent implements OnInit {
   adopciones: Adopcion[] = [];
   misPublicaciones: Adopcion[] = [];
   misSolicitudes: SolicitudAdopcion[] = [];
+  solicitudesRecibidas: SolicitudAdopcion[] = [];
   inventario: Mascota[] = [];
+
+  private solicitudesAll: SolicitudAdopcion[] = [];
+  private adopcionesById = new Map<number, Adopcion>();
 
   private mascotasById = new Map<number, Mascota>();
   private usuariosById = new Map<number, Usuario>();
@@ -145,7 +148,9 @@ export class AdopcionesComponent implements OnInit {
     this.http.get<any>(`${this.API}/alladopciones`).subscribe({
       next: (data) => {
         this.adopciones = this.normalizeList<any>(data).map((x) => this.normalizeAdopcion(x));
+        this.reconstruirAdopcionesById();
         this.recalcularDerivados();
+        this.recalcularSolicitudesDerivadas();
         this.cargando = false;
       },
       error: (err) => {
@@ -159,8 +164,8 @@ export class AdopcionesComponent implements OnInit {
     this.http.get<any>(`${this.API}/allsolicitudes-adopcion`).subscribe({
       next: (data) => {
         const all = this.normalizeList<any>(data).map((x) => this.normalizeSolicitud(x));
-        this.misSolicitudes = this.userId == null ? [] : all.filter((s) => Number(s.solicitanteId) === this.userId);
-        this.reconstruirSolicitudMap();
+        this.solicitudesAll = all;
+        this.recalcularSolicitudesDerivadas();
       },
       error: (err) => {
         console.error(err);
@@ -285,6 +290,45 @@ export class AdopcionesComponent implements OnInit {
     for (const ad of this.misPublicaciones) this.adopcionByMascotaId.set(Number(ad.mascotaId), ad);
   }
 
+  private reconstruirAdopcionesById(): void {
+    this.adopcionesById.clear();
+    for (const a of this.adopciones) {
+      this.adopcionesById.set(Number(a.id), a);
+    }
+  }
+
+  private recalcularSolicitudesDerivadas(): void {
+    if (this.userId == null) {
+      this.misSolicitudes = [];
+      this.solicitudesRecibidas = [];
+      this.solicitudByAdopcionId.clear();
+      return;
+    }
+
+    const uid = Number(this.userId);
+    const all = this.solicitudesAll ?? [];
+
+    this.misSolicitudes = all.filter((s) => Number(s.solicitanteId) === uid);
+
+    // solicitudes que le enviaron a MIS publicaciones
+    this.solicitudesRecibidas = all.filter((s) => {
+      const ad = this.adopcionesById.get(Number(s.adopcionId));
+      return !!ad && Number(ad.usuarioPublicadorId) === uid;
+    });
+
+    const t = (s: SolicitudAdopcion) => {
+      const d = new Date(s.fechaSolicitud ?? '');
+      const ms = d.getTime();
+      return Number.isFinite(ms) ? ms : 0;
+    };
+
+    this.misSolicitudes.sort((a, b) => t(b) - t(a));
+    this.solicitudesRecibidas.sort((a, b) => t(b) - t(a));
+
+    // mapa para “ya solicité” en Explorar
+    this.reconstruirSolicitudMap();
+  }
+
   private reconstruirSolicitudMap(): void {
     this.solicitudByAdopcionId.clear();
     for (const s of this.misSolicitudes) {
@@ -361,6 +405,47 @@ export class AdopcionesComponent implements OnInit {
       error: (err) => {
         console.error(err);
         this.showToast('No se pudo cancelar la solicitud.');
+      }
+    });
+  }
+
+  // --------------------------
+  // ✅ SOLICITUDES RECIBIDAS
+  // --------------------------
+  getAdopcionDeSolicitud(s: SolicitudAdopcion): Adopcion | null {
+    return this.adopcionesById.get(Number(s.adopcionId)) ?? null;
+  }
+
+  getMascotaDeSolicitud(s: SolicitudAdopcion): Mascota | null {
+    const ad = this.getAdopcionDeSolicitud(s);
+    if (!ad) return null;
+    return this.getMascotaDeAdopcion(ad);
+  }
+
+  getNombreSolicitante(s: SolicitudAdopcion): string {
+    const u = this.usuariosById.get(Number(s.solicitanteId));
+    if (!u) return `Usuario #${s.solicitanteId}`;
+
+    const full =
+      u.nombreCompleto ||
+      this.joinNonEmpty(u.nombre, u.apellidoPaterno, u.apellidoMaterno) ||
+      this.joinNonEmpty(u.nombre, u.apellido) ||
+      u.username ||
+      u.email;
+
+    return full?.trim() || `Usuario #${s.solicitanteId}`;
+  }
+
+  cambiarEstadoSolicitud(s: SolicitudAdopcion, estado: SolicitudAdopcion['estado']): void {
+    const body = { ...s, estado };
+    this.http.put(`${this.API}/update-solicitud-adopcion/${s.id}`, body).subscribe({
+      next: () => {
+        this.showToast(`Solicitud ${estado}.`);
+        this.refrescarTodo();
+      },
+      error: (err) => {
+        console.error(err);
+        this.showToast('No se pudo actualizar la solicitud.');
       }
     });
   }
