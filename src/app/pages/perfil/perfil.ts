@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, HostListener, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { environment } from '../../../environments/environment';
+
 
 import { AuthService } from '../../services/auth.service';
 
@@ -61,7 +63,7 @@ type SolicitudLite = { solicitanteId?: number | string | null; estado?: string |
   styleUrl: './perfil.css',
 })
 export class Perfil implements OnInit {
-  private readonly API_BASE = '/api/petcare';
+private readonly API_BASE = `${environment.apiUrl.replace(/\/$/, '')}/api/petcare`;
   private auth = inject(AuthService);
   private readonly LS_SESSION = 'petcare.session.v1';
   private cdr = inject(ChangeDetectorRef);
